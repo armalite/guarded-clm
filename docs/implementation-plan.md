@@ -1,116 +1,81 @@
 # Implementation plan
 
-This is the roadmap: bounded chunks in order, each with its scope, dependencies, completion checks, status and open decisions. Other documents hold the rest:
-- [SPEC.md](../SPEC.md) defines behaviour;
-- [decisions.md](decisions.md) records the decisions taken and the open questions;
-- [architecture.md](architecture.md) describes the structure;
-- the local, untracked `docs/HANDOFF.md` records the exact resume point.
+This is the roadmap.
+- [SPEC.md](../SPEC.md) defines behaviour.
+- [decisions.md](decisions.md) records the decisions and open questions.
+- [architecture.md](architecture.md) describes the structure.
+- The local, untracked `docs/HANDOFF.md` records the exact resume point.
 
-This file links to them rather than repeating them.
+This file links to those documents rather than repeating them.
 
-**Later chunks are planned, not authorised.** Each starts only on an explicit instruction, and a chunk may be split further to fit one working session. Throughout, there are no provider API calls, spending, commits, pushes or publication unless separately authorised.
+**Course correction (2026-10-15).** guarded-clm publishes an existing, tested implementation of a Pydantic AI capability (`ClmContext`), ported faithfully. The earlier plan was superseded; it rebuilt the library independently in five chunks from a behavioural description. That plan's preliminary core (`GuardedConfig`, `GuardedContext`) differed from the tested behaviour and has been **retired**, not kept beside the port. See decision P1 in [decisions.md](decisions.md).
 
-| # | Chunk | Status |
+**Later steps are planned, not authorised.** Each needs an explicit instruction. Throughout, there are no provider API calls, spending, commits, pushes or publication unless separately authorised.
+
+| # | Step | Status |
 | --- | --- | --- |
-| 1 | Repository setup, configuration, context store, transactional edits, protected turns | **done** (2026-10-15) |
-| 2 | Request builder, size estimation, output guard and recovery | planned |
-| 3 | Anthropic adapter with scripted end-to-end verification | planned |
-| 4 | Pydantic AI capability with offline history and execution-order verification | planned |
-| 5 | clm-lib integration, pinned library provenance, offline experiment readiness | planned |
+| 1 | Faithful implementation port, and reconciliation of the existing core | **done** (2026-10-15) |
+| 2 | Offline differential verification and packaging | **done** (2026-10-15) |
+| 3 | clm-lib integration, using the actual library at recorded provenance | planned |
+| 4 | Public experiments | planned; needs separate authorisation |
 
-## 1. Repository setup, configuration, context store, transactional edits, protected turns
+## 1. Faithful implementation port, and reconciliation of the existing core
 
-- **Scope:**
-  - the project layout, tooling and agent instructions;
-  - the validated configuration (`GuardedConfig`);
-  - entries, edit operations, snapshots and edit results;
-  - the authoritative `ContextStore`, with deterministic serialisation and structural limits;
-  - transactional `delete` / `replace` / `add_note`;
-  - runtime-owned protection and the reserved ID namespaces;
-  - the turn lifecycle (`GuardedContext`), with an idempotent request-preparation hook;
-  - a model-free example.
+- **Scope:** port the full library under the `guarded_clm` import package, keeping its behaviour identical:
+  - the entries, store, revisions, appends and collision handling;
+  - validation and serialisation;
+  - edit operations and receipts;
+  - turn detection, answer capture and protection;
+  - request reconstruction, the instructions and the edit tool;
+  - the shared and the conservative estimators, the guard, edit snapshots, held outputs and refetches;
+  - pressure and recovery;
+  - step and call limits, and notices;
+  - conversation state, trace records and exceptions;
+  - the `clm_context()` factory and the Pydantic AI integration.
 
-  See SPEC §1–§8.
+  Then retire the preliminary core, with its tests and docs.
 - **Depends on:** nothing.
 - **Done when:**
-  - ruff, format, mypy and pytest are clean;
-  - the package builds, and the wheel installs in a clean environment and runs the example;
-  - the docs and handoffs are updated;
-  - clm-lib and clm-lib-test-results have pointers only.
-- **Status:** done (2026-10-15). The checks are in [results.md](results.md).
-- **Open decisions:** none block this chunk. Items it exposed are in [decisions.md](decisions.md) under "Unresolved".
+  - one implementation exists;
+  - the public names are kept (`ClmContext`, `ClmStepLimit`, `clm_context`);
+  - compatibility strings are unchanged: the context format, the tool name, the trace variant and record types.
+- **Open decisions:** none for the port itself. The design's open questions are in [decisions.md](decisions.md).
 
-## 2. Request builder, size estimation, output guard and recovery
-
-If this does not fit one session, it can be split into 2a (request builder and the shared estimator), 2b (the output guard) and 2c (the recovery state machine).
+## 2. Offline differential verification and packaging
 
 - **Scope:**
-  - building the request (system prompt, plus one reconstructed user message with the task, working context and runtime status);
-  - runtime step entries (`sN.act`, `sN.obs`, `sN.rcpt`);
-  - the shared estimator, anchored to reported input usage;
-  - the conservative output guard;
-  - pressure and the recovery state machine;
-  - task-step and call counters, including the specified free-step rule.
-
-  See SPEC §9 (planned).
-- **Depends on:** chunk 1. The request builder will call the `GuardedContext.prepare_request()` hook.
+  - an offline comparison of the port with an untouched reference copy, in separate processes;
+  - a fresh public scenario suite with recorded transcripts;
+  - unit tests;
+  - a lockfile from public PyPI only;
+  - building and inspecting the wheel and sdist;
+  - a clean-environment install and example.
+- **Depends on:** step 1.
 - **Done when:**
-  - the builder's output is deterministic and covered by tests;
-  - the estimator is tested only against recorded or scripted usage that is labelled as such;
-  - every guard decision rule has a test, including held-output ordering;
-  - the recovery transitions are tested;
-  - nothing calls a provider.
-- **Open decisions (must be settled before or during this chunk):**
-  - the malformed escaping instruction;
-  - the accounting meaning of the 144-call cap;
-  - re-arming recovery after a return below the limit, checked against clm-lib's existing behaviour;
-  - placeholder overflow, and an output too large on its own;
-  - whether later calls run after an output is held;
-  - mapping provider usage, including cache reads and writes, to append-only observations;
-  - exhaustion when protected history fills the budget.
+  - every comparison is identical, or each difference is explained;
+  - the public suite and the gates pass;
+  - the artefacts contain no private metadata.
 
-  All are listed in [decisions.md](decisions.md).
+  The results and their limits are in [results.md](results.md).
 
-## 3. Anthropic adapter with scripted end-to-end verification
+## 3. clm-lib integration at recorded provenance
 
 - **Scope:**
-  - an optional adapter, kept out of the core import path;
-  - tool definitions for `edit_context` and read-only task tools;
-  - mapping responses to calls processed in order;
-  - usage mapping;
-  - end-to-end tests with a scripted client.
-- **Depends on:** chunk 2.
-- **Done when:**
-  - scripted end-to-end runs pass;
-  - the core still imports without the Anthropic SDK;
-  - live compatibility is explicitly **not** claimed.
-- **Open decisions:**
-  - provider-required content blocks (for example, thinking blocks) in reconstructed requests;
-  - support for tools with side effects (future work).
-
-## 4. Pydantic AI capability with offline history and execution-order verification
-
-- **Scope:**
-  - an optional Pydantic AI integration exposing the same behaviour;
-  - offline tests of message-history handling and in-order execution of several calls.
-- **Depends on:** chunks 2 and 3, for the shared request and tool semantics.
-- **Done when:**
-  - offline tests pass with a test model;
-  - the core still imports without Pydantic AI.
-- **Open decisions:** the exact integration point in Pydantic AI, to be checked against its official documentation at that time.
-
-## 5. clm-lib integration, pinned library provenance and offline experiment readiness
-
-- **Scope:**
-  - clm-lib imports a pinned guarded-clm (version, or commit plus hash) for programme 015's lite arms;
+  - clm-lib imports guarded-clm at a recorded version or commit for programme 015's lite arm;
   - run provenance records the library version;
-  - an offline proof through clm-lib's real runner and sandbox.
-- **Depends on:** chunks 2 and 3. Chunk 4 is not required for the harness.
-- **Done when:**
-  - clm-lib's offline tests pass using the imported library, with no duplicate implementation in clm-lib;
-  - provenance is recorded;
-  - experiment readiness is documented.
-  - Any live run needs a separate authorisation.
+  - offline proof through clm-lib's real runner and sandbox, with no duplicate implementation in clm-lib.
+- **Initial integration target:** the tested Pydantic AI capability. clm-lib's own runner is not Pydantic AI based, so how it hosts the capability is the first design question of this step.
+- **Depends on:** step 2.
 - **Open decisions:**
-  - how the 015 lite arms (`clm_lite_v2`, `clm_lite_v3_1`) map onto library configuration;
-  - the pinning mechanism (a local path, a git commit or a release).
+  - the hosting approach;
+  - the pinning mechanism;
+  - how the 015 lite arms map onto `clm_context()` settings.
+
+## 4. Public experiments
+
+Only after separate authorisation, with a frozen protocol in the results repository.
+
+## Deferred, not part of this plan
+
+- **A separate Anthropic adapter, or a provider-neutral core rewrite.** Either would need explicit equivalence requirements: the same transcripts through each adapter. Neither may change the ported behaviour.
+- **Changes to the design's documented limitations.** Each needs a separately approved revision and new expected transcripts.

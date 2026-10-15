@@ -1,16 +1,21 @@
 [project]
 name = "guarded-clm"
 version = "0.1.0.dev0"
-description = "Model-controlled working context for AI agents, with structured edits, guarded tool outputs and protected conversation history."
+description = "ClmContext: a Pydantic AI capability that lets the model manage its own working context within a token budget, with structured edits, guarded tool outputs and protected conversation history."
 readme = "README.md"
-license = "Apache-2.0"
-license-files = ["LICENSE"]
+requires-python = ">=3.11,<3.14"
 authors = [{ name = "armalite" }]
-requires-python = ">=3.11"
-dependencies = []
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+# Pinned to the Pydantic AI minor the design was tested on (2.27.1). A new minor needs the transcript tests to pass
+# on it first (docs/decisions.md, P4).
+dependencies = ["pydantic-ai-slim>=2.27.1,<2.28"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Typing :: Typed",
 ]
 
@@ -18,24 +23,69 @@ classifiers = [
 Repository = "https://github.com/armalite/guarded-clm"
 
 [dependency-groups]
-dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10"]
+dev = [
+    "pyright==1.1.414",
+    "pytest~=9.0",
+    "ruff==0.16.8",
+]
 
 [build-system]
-requires = ["uv_build>=0.12.7,<0.13.0"]
-build-backend = "uv_build"
+requires = ["hatchling>=1.27"]  # licence expressions and license-files (PEP 639)
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/guarded_clm"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/guarded_clm", "README.md", "LICENSE", "NOTICE"]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.11"
+include = ["src", "tests", "examples"]
+extraPaths = ["src"]
+exclude = ["**/__pycache__", "**/.*", "build", "dist"]
 
 [tool.ruff]
-line-length = 100
-target-version = "py311"
+line-length = 120
+src = ["src", "."]
+fix = false
+show-fixes = true
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+select = [
+    "F",     # pyflakes
+    "E",     # pycodestyle
+    "W",     # pycodestyle
+    "ANN",   # type annotations
+    "N",     # pep8-naming
+    "B",     # bugbear
+    "I",     # isort
+    "ARG",   # flake8-unused-arguments
+    "SLF",   # flake8-self
+    "UP",    # pyupgrade
+    "PERF",  # perflint
+    "RUF",   # ruff-specific
+    "SIM",   # flake8-simplify
+    "ASYNC", # flake8-async
+]
+ignore = [
+    "ANN204", # no return type needed on dunder methods
+    "ANN401", # Any is the honest type for Pydantic AI's deps and tool arguments here
+    "I001",   # import ordering is handled by ruff format
+    "RUF001", # the held-back note's ellipsis is part of the tested text
+]
 
-[tool.mypy]
-python_version = "3.11"
-strict = true
-files = ["src", "tests", "examples"]
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-wrap-aliases = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN001", "ANN201", "ANN202", "ARG001", "SLF001", "E501"]
+# The instructions are the tested text, kept line for line.
+"src/guarded_clm/instructions.py" = ["E501"]
 
 [tool.pytest.ini_options]
+pythonpath = ["."]
 testpaths = ["tests"]
-addopts = "-q"

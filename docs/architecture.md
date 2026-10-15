@@ -1,67 +1,58 @@
 # Architecture
 
-Behaviour is defined in [SPEC.md](../SPEC.md). This document describes structure and boundaries.
+Behaviour is defined in [SPEC.md](../SPEC.md). This document describes the structure.
 
-## Core versus adapters
-
-```
-            planned adapters (optional extras, separate import paths)
-   ┌───────────────────────────┐   ┌───────────────────────────────┐
-   │ Anthropic adapter (ch. 3) │   │ Pydantic AI capability (ch. 4)│
-   └─────────────┬─────────────┘   └───────────────┬───────────────┘
-                 │  tool calls in order, usage     │
-                 ▼                                 ▼
-   ┌────────────────────────────────────────────────────────────────┐
-   │ guarded_clm core (stdlib only)                                 │
-   │  planned (ch. 2): request builder · estimator · output guard · │
-   │                   recovery state machine · counters            │
-   │  implemented (ch. 1):                                          │
-   │    GuardedContext  turn lifecycle, prepare_request() hook      │
-   │    ContextStore    entries, revisions, transactions, limits    │
-   │    Entry / edits   validation, canonical serialisation         │
-   │    GuardedConfig   validated settings                          │
-   └────────────────────────────────────────────────────────────────┘
-                 ▲
-                 │ imports a pinned version (ch. 5)
-   ┌─────────────┴──────────────┐
-   │ clm-lib experiment harness │  (separate repository; no duplicate implementation)
-   └────────────────────────────┘
-```
-
-| Module | Responsibility |
-| --- | --- |
-| `config.py` | `GuardedConfig`: validation of types and ranges |
-| `entries.py` | `Entry`, the ID and role rules, reserved namespaces, structural limits, canonical serialisation |
-| `edits.py` | the `Delete` / `Replace` / `AddNote` operations, strict parsing of their JSON form, `EditResult` and receipts |
-| `store.py` | `ContextStore` (the authoritative state and revisions) and `Snapshot` |
-| `context.py` | `GuardedContext`: turn states, the task anchor, the current request, record materialisation |
-
-## Store and transaction boundaries
-
-- **Immutable state:** the live state is an immutable tuple of frozen `Entry` objects plus a revision number. A `Snapshot` shares that tuple, so it is cheap and cannot be used to change the live state. `to_dict()` returns copies.
-- **One path for every change:** all changes go through a single commit path that validates the complete candidate state. Model transactions (`apply_edits`) build a candidate list, apply the operations in order, check the structural limits once on the result, and commit at most one revision. Host appends and lifecycle materialisation use the same checks.
-- **Errors split by source:** model-influenced input yields result objects (`EditResult`, `ChangeResult`, `PrepareResult`), never exceptions. Host programming errors (lifecycle misuse, an invalid configuration) raise exceptions.
-- **Trust:** host APIs are trusted and validate their input; they are not a sandbox (SPEC §7).
-
-## Future request-building flow (planned, chunk 2)
+## Modules
 
 ```
-start_turn(request) ─► prepare_request()  (materialise turn records, idempotent)
-                        │
-                        ▼
-                  build request: system prompt + one user message
-                  [task | working_context (canonical JSON) | runtime_status (+ current request)]
-                        │
-                        ▼
-                  adapter sends; response tool calls processed in order:
-                    edit_context → apply_edits (never held)
-                    task tools   → output guard (estimate; hold or deliver)
-                        │
-                        ▼
-                  append sN.act / sN.obs / sN.rcpt; update estimator from usage;
-                  pressure / recovery state; next request or submit_answer
+src/guarded_clm/
+  __init__.py       public API: clm_context(), ClmContext, ClmStepLimit, errors, constants
+  capability.py     ClmContext: request rebuild, absorb (folding steps in), guard, edits, notices, hooks
+  steps.py          ClmStepLimit: task steps (edit steps free), the call cap, the finalize notice
+  context.py        entries, limits, validation, the revision store (derived from clm-lib)
+  estimate.py       request-size measurement, the shared estimator and its calibration, conversation state
+  instructions.py   the instruction text, as tested
+  errors.py         ContextLimitError, BudgetExceededError, StepLimitError
+tests/
+  golden/scenarios.py   32 scripted scenarios (synthetic data; depends only on Pydantic AI)
+  golden/data/*.json    the stored transcripts
+  test_golden.py        the exact transcript check
+  test_clm_context.py   readable unit tests
+  test_paths.py         further path tests (estimator modes, serialisation, protection, overshoot, example)
+scripts/record_transcripts.py   records or checks the transcripts against any implementation (--package)
+examples/basic_agent.py         an offline, runnable usage example
 ```
 
-## The experiment harness
+## How it plugs into Pydantic AI
 
-clm-lib, a separate repository, will import a pinned guarded-clm for its programme-015 lite arms (plan chunk 5) and record the library version in run provenance. clm-lib does not contain a copy of this logic.
+`clm_context()` returns a `CombinedCapability` of `ClmStepLimit`, then `ClmContext`. Both are Pydantic AI capabilities, and their hooks run in that order around every model request.
+
+```
+agent.run(prompt, conversation_id, message_history)
+  for_run: per-run copies; ClmContext's copy shares the per-conversation state (context store, estimator)
+  each model request:
+    ClmStepLimit.before_model_request   step/call limits; finalize notice appended to the request
+    ClmContext.before_model_request     absorb: fold new responses, tool results, answers and turns into the store
+                                        (the guard holds back outputs that don't fit); rebuild the request as
+                                        system prompt + one user message <task>/<working_context>/<runtime_status>;
+                                        PRESSURE / OVER LIMIT / ContextLimitError
+    model call
+    ClmStepLimit.after_model_request    count the call and the task step (free if the first call is edit_context)
+    ClmContext.after_model_request      observe density r; calibrate the estimator; parallel-call and overshoot
+                                        records; snapshot the entries before this response's tools run
+  tools run (Pydantic AI's own execution, concurrently for sync tools); edit_context applies operations to the
+  store and snapshots the result for the guard
+```
+
+## State
+
+- **Per conversation:** the context store and the size estimator live in the capability instance, in memory (at most 512 conversations).
+- **Per session object:** the guard and density state.
+- **Per run:** the call and step counters.
+
+SPEC.md section 12 has the details and their consequences.
+
+## Boundaries
+
+- **The framework:** the library depends on Pydantic AI only, pinned to the tested minor. A provider-neutral core or a separate provider adapter is deferred ([implementation-plan.md](implementation-plan.md)). Either would need the same transcripts to pass through it.
+- **The experiment harness:** clm-lib, a separate repository, will import this library at a recorded version (plan step 3). It does not copy its logic.

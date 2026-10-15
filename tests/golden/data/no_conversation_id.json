@@ -1,0 +1,1874 @@
+{
+ "scenario": "no_conversation_id",
+ "transcript": {
+  "calls": [
+   {
+    "messages": [
+     {
+      "parts": [
+       {
+        "content": "You are a careful operations assistant. Use the tools to answer.",
+        "dynamic_ref": null,
+        "part_kind": "system-prompt"
+       },
+       {
+        "content": "<task>\nfirst\n</task>\n\n<working_context>\n\n</working_context>\n\n<runtime_status>\nstep 1; task steps used this turn 0 of 60 (edit_context steps are free); model calls this turn 0 of 144\nrequest size: about 2,262 of 29,952 tokens (8% of the limit); budget 32,000\ncontext revision 0, 0 entries\n</runtime_status>\n",
+        "part_kind": "user-prompt"
+       }
+      ],
+      "instructions": null,
+      "kind": "request",
+      "metadata": null,
+      "state": "complete"
+     }
+    ],
+    "instructions": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+    "parameters": {
+     "function_tools": [
+      {
+       "name": "status",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the service status.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "greet",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "name": {
+          "description": "Who to greet.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "name"
+        ],
+        "type": "object"
+       },
+       "description": "Send a greeting to an on-call engineer.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "big",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the long build log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "huge",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the full crash dump.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "wide",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the raw trace file.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "logs",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "n": {
+          "description": "The page number, from 1.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "n"
+        ],
+        "type": "object"
+       },
+       "description": "Read one page of the request log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "search",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "query": {
+          "description": "What to look for.",
+          "type": "string"
+         },
+         "limit": {
+          "default": 5,
+          "description": "The most results to return.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "query"
+        ],
+        "type": "object"
+       },
+       "description": "Search the runbook.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "ticket",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "key": {
+          "description": "The ticket key.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "key"
+        ],
+        "type": "object"
+       },
+       "description": "Look up a ticket by key.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "tally",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "items": {
+          "description": "The items.",
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "items"
+        ],
+        "type": "object"
+       },
+       "description": "Count items.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "flaky",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "attempt": {
+          "description": "The attempt number, from 0.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "attempt"
+        ],
+        "type": "object"
+       },
+       "description": "A probe that fails on its first attempt.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "broken",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "A tool whose backend is down.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "snapshot",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Take a dashboard snapshot (an image plus a caption).",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "diagram",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Fetch the topology diagram.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "edit_context",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "ops": {
+          "description": "A list of {\"op\": \"delete\", \"ids\": [...]}, {\"op\": \"replace\", \"id\": ..., \"body\": ...} or\n{\"op\": \"add_note\", \"id\": ..., \"body\": ...}.",
+          "items": {
+           "additionalProperties": true,
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "ops"
+        ],
+        "type": "object"
+       },
+       "description": "Apply operations to your working context, in order.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      }
+     ],
+     "native_tools": [],
+     "tool_visibility": {
+      "status": "visible",
+      "greet": "visible",
+      "big": "visible",
+      "huge": "visible",
+      "wide": "visible",
+      "logs": "visible",
+      "search": "visible",
+      "ticket": "visible",
+      "tally": "visible",
+      "flaky": "visible",
+      "broken": "visible",
+      "snapshot": "visible",
+      "diagram": "visible",
+      "edit_context": "visible"
+     },
+     "revealed_tool_names": [],
+     "output_mode": "text",
+     "output_object": null,
+     "output_tools": [],
+     "prompted_output_template": null,
+     "allow_text_output": true,
+     "allow_image_output": false,
+     "instruction_parts": [
+      {
+       "content": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+       "dynamic": false,
+       "part_kind": "instruction"
+      }
+     ],
+     "thinking": null
+    },
+    "settings": null,
+    "reported_input_tokens": 2398
+   },
+   {
+    "messages": [
+     {
+      "parts": [
+       {
+        "content": "You are a careful operations assistant. Use the tools to answer.",
+        "dynamic_ref": null,
+        "part_kind": "system-prompt"
+       },
+       {
+        "content": "<task>\nfirst\n</task>\n\n<working_context>\n{\"id\": \"s1.act\", \"role\": \"assistant\", \"body\": \"status({})\"}\n{\"id\": \"s1.obs\", \"role\": \"observation\", \"body\": \"[status]\\nservice status: degraded since 09:12, queue depth 4,812\"}\n</working_context>\n\n<runtime_status>\nstep 2; task steps used this turn 1 of 60 (edit_context steps are free); model calls this turn 1 of 144\nrequest size: about 2,477 of 29,952 tokens (8% of the limit); budget 32,000\ncontext revision 1, 2 entries\n</runtime_status>\n",
+        "part_kind": "user-prompt"
+       }
+      ],
+      "instructions": null,
+      "kind": "request",
+      "metadata": null,
+      "state": "complete"
+     }
+    ],
+    "instructions": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+    "parameters": {
+     "function_tools": [
+      {
+       "name": "status",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the service status.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "greet",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "name": {
+          "description": "Who to greet.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "name"
+        ],
+        "type": "object"
+       },
+       "description": "Send a greeting to an on-call engineer.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "big",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the long build log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "huge",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the full crash dump.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "wide",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the raw trace file.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "logs",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "n": {
+          "description": "The page number, from 1.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "n"
+        ],
+        "type": "object"
+       },
+       "description": "Read one page of the request log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "search",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "query": {
+          "description": "What to look for.",
+          "type": "string"
+         },
+         "limit": {
+          "default": 5,
+          "description": "The most results to return.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "query"
+        ],
+        "type": "object"
+       },
+       "description": "Search the runbook.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "ticket",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "key": {
+          "description": "The ticket key.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "key"
+        ],
+        "type": "object"
+       },
+       "description": "Look up a ticket by key.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "tally",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "items": {
+          "description": "The items.",
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "items"
+        ],
+        "type": "object"
+       },
+       "description": "Count items.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "flaky",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "attempt": {
+          "description": "The attempt number, from 0.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "attempt"
+        ],
+        "type": "object"
+       },
+       "description": "A probe that fails on its first attempt.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "broken",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "A tool whose backend is down.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "snapshot",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Take a dashboard snapshot (an image plus a caption).",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "diagram",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Fetch the topology diagram.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "edit_context",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "ops": {
+          "description": "A list of {\"op\": \"delete\", \"ids\": [...]}, {\"op\": \"replace\", \"id\": ..., \"body\": ...} or\n{\"op\": \"add_note\", \"id\": ..., \"body\": ...}.",
+          "items": {
+           "additionalProperties": true,
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "ops"
+        ],
+        "type": "object"
+       },
+       "description": "Apply operations to your working context, in order.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      }
+     ],
+     "native_tools": [],
+     "tool_visibility": {
+      "status": "visible",
+      "greet": "visible",
+      "big": "visible",
+      "huge": "visible",
+      "wide": "visible",
+      "logs": "visible",
+      "search": "visible",
+      "ticket": "visible",
+      "tally": "visible",
+      "flaky": "visible",
+      "broken": "visible",
+      "snapshot": "visible",
+      "diagram": "visible",
+      "edit_context": "visible"
+     },
+     "revealed_tool_names": [],
+     "output_mode": "text",
+     "output_object": null,
+     "output_tools": [],
+     "prompted_output_template": null,
+     "allow_text_output": true,
+     "allow_image_output": false,
+     "instruction_parts": [
+      {
+       "content": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+       "dynamic": false,
+       "part_kind": "instruction"
+      }
+     ],
+     "thinking": null
+    },
+    "settings": null,
+    "reported_input_tokens": 2482
+   },
+   {
+    "messages": [
+     {
+      "parts": [
+       {
+        "content": "You are a careful operations assistant. Use the tools to answer.",
+        "dynamic_ref": null,
+        "part_kind": "system-prompt"
+       },
+       {
+        "content": "<task>\nfirst\n\nCurrent request:\nsecond\n</task>\n\n<working_context>\n{\"id\": \"s1.act\", \"role\": \"assistant\", \"body\": \"status({})\"}\n{\"id\": \"s1.obs\", \"role\": \"observation\", \"body\": \"[status]\\nservice status: degraded since 09:12, queue depth 4,812\"}\n{\"id\": \"t1.answer\", \"role\": \"assistant\", \"body\": \"one\", \"protected\": true}\n</working_context>\n\n<runtime_status>\nstep 2; task steps used this turn 0 of 60 (edit_context steps are free); model calls this turn 0 of 144\nrequest size: about 2,528 of 29,952 tokens (8% of the limit); budget 32,000\ncontext revision 2, 3 entries\n</runtime_status>\n",
+        "part_kind": "user-prompt"
+       }
+      ],
+      "instructions": null,
+      "kind": "request",
+      "metadata": null,
+      "state": "complete"
+     }
+    ],
+    "instructions": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+    "parameters": {
+     "function_tools": [
+      {
+       "name": "status",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the service status.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "greet",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "name": {
+          "description": "Who to greet.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "name"
+        ],
+        "type": "object"
+       },
+       "description": "Send a greeting to an on-call engineer.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "big",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the long build log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "huge",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the full crash dump.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "wide",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the raw trace file.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "logs",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "n": {
+          "description": "The page number, from 1.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "n"
+        ],
+        "type": "object"
+       },
+       "description": "Read one page of the request log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "search",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "query": {
+          "description": "What to look for.",
+          "type": "string"
+         },
+         "limit": {
+          "default": 5,
+          "description": "The most results to return.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "query"
+        ],
+        "type": "object"
+       },
+       "description": "Search the runbook.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "ticket",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "key": {
+          "description": "The ticket key.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "key"
+        ],
+        "type": "object"
+       },
+       "description": "Look up a ticket by key.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "tally",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "items": {
+          "description": "The items.",
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "items"
+        ],
+        "type": "object"
+       },
+       "description": "Count items.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "flaky",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "attempt": {
+          "description": "The attempt number, from 0.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "attempt"
+        ],
+        "type": "object"
+       },
+       "description": "A probe that fails on its first attempt.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "broken",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "A tool whose backend is down.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "snapshot",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Take a dashboard snapshot (an image plus a caption).",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "diagram",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Fetch the topology diagram.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "edit_context",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "ops": {
+          "description": "A list of {\"op\": \"delete\", \"ids\": [...]}, {\"op\": \"replace\", \"id\": ..., \"body\": ...} or\n{\"op\": \"add_note\", \"id\": ..., \"body\": ...}.",
+          "items": {
+           "additionalProperties": true,
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "ops"
+        ],
+        "type": "object"
+       },
+       "description": "Apply operations to your working context, in order.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      }
+     ],
+     "native_tools": [],
+     "tool_visibility": {
+      "status": "visible",
+      "greet": "visible",
+      "big": "visible",
+      "huge": "visible",
+      "wide": "visible",
+      "logs": "visible",
+      "search": "visible",
+      "ticket": "visible",
+      "tally": "visible",
+      "flaky": "visible",
+      "broken": "visible",
+      "snapshot": "visible",
+      "diagram": "visible",
+      "edit_context": "visible"
+     },
+     "revealed_tool_names": [],
+     "output_mode": "text",
+     "output_object": null,
+     "output_tools": [],
+     "prompted_output_template": null,
+     "allow_text_output": true,
+     "allow_image_output": false,
+     "instruction_parts": [
+      {
+       "content": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+       "dynamic": false,
+       "part_kind": "instruction"
+      }
+     ],
+     "thinking": null
+    },
+    "settings": null,
+    "reported_input_tokens": 2531
+   },
+   {
+    "messages": [
+     {
+      "parts": [
+       {
+        "content": "You are a careful operations assistant. Use the tools to answer.",
+        "dynamic_ref": null,
+        "part_kind": "system-prompt"
+       },
+       {
+        "content": "<task>\nthird\n</task>\n\n<working_context>\n\n</working_context>\n\n<runtime_status>\nstep 1; task steps used this turn 0 of 60 (edit_context steps are free); model calls this turn 0 of 144\nrequest size: about 2,262 of 29,952 tokens (8% of the limit); budget 32,000\ncontext revision 0, 0 entries\n</runtime_status>\n",
+        "part_kind": "user-prompt"
+       }
+      ],
+      "instructions": null,
+      "kind": "request",
+      "metadata": null,
+      "state": "complete"
+     }
+    ],
+    "instructions": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+    "parameters": {
+     "function_tools": [
+      {
+       "name": "status",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the service status.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "greet",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "name": {
+          "description": "Who to greet.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "name"
+        ],
+        "type": "object"
+       },
+       "description": "Send a greeting to an on-call engineer.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "big",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the long build log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "huge",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the full crash dump.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "wide",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the raw trace file.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "logs",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "n": {
+          "description": "The page number, from 1.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "n"
+        ],
+        "type": "object"
+       },
+       "description": "Read one page of the request log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "search",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "query": {
+          "description": "What to look for.",
+          "type": "string"
+         },
+         "limit": {
+          "default": 5,
+          "description": "The most results to return.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "query"
+        ],
+        "type": "object"
+       },
+       "description": "Search the runbook.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "ticket",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "key": {
+          "description": "The ticket key.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "key"
+        ],
+        "type": "object"
+       },
+       "description": "Look up a ticket by key.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "tally",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "items": {
+          "description": "The items.",
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "items"
+        ],
+        "type": "object"
+       },
+       "description": "Count items.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "flaky",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "attempt": {
+          "description": "The attempt number, from 0.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "attempt"
+        ],
+        "type": "object"
+       },
+       "description": "A probe that fails on its first attempt.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "broken",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "A tool whose backend is down.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "snapshot",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Take a dashboard snapshot (an image plus a caption).",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "diagram",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Fetch the topology diagram.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "edit_context",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "ops": {
+          "description": "A list of {\"op\": \"delete\", \"ids\": [...]}, {\"op\": \"replace\", \"id\": ..., \"body\": ...} or\n{\"op\": \"add_note\", \"id\": ..., \"body\": ...}.",
+          "items": {
+           "additionalProperties": true,
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "ops"
+        ],
+        "type": "object"
+       },
+       "description": "Apply operations to your working context, in order.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      }
+     ],
+     "native_tools": [],
+     "tool_visibility": {
+      "status": "visible",
+      "greet": "visible",
+      "big": "visible",
+      "huge": "visible",
+      "wide": "visible",
+      "logs": "visible",
+      "search": "visible",
+      "ticket": "visible",
+      "tally": "visible",
+      "flaky": "visible",
+      "broken": "visible",
+      "snapshot": "visible",
+      "diagram": "visible",
+      "edit_context": "visible"
+     },
+     "revealed_tool_names": [],
+     "output_mode": "text",
+     "output_object": null,
+     "output_tools": [],
+     "prompted_output_template": null,
+     "allow_text_output": true,
+     "allow_image_output": false,
+     "instruction_parts": [
+      {
+       "content": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+       "dynamic": false,
+       "part_kind": "instruction"
+      }
+     ],
+     "thinking": null
+    },
+    "settings": null,
+    "reported_input_tokens": 2398
+   }
+  ],
+  "records": [
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_guard_check",
+    "step": 1,
+    "r": 1.5,
+    "shared_base": 2398,
+    "added_chars": 202,
+    "conservative_added": 149,
+    "projected": 2547
+   }
+  ],
+  "runs": [
+   {
+    "prompt": "first",
+    "calls": 2,
+    "output": "one",
+    "all_messages": [
+     {
+      "parts": [
+       {
+        "content": "You are a careful operations assistant. Use the tools to answer.",
+        "dynamic_ref": null,
+        "part_kind": "system-prompt"
+       },
+       {
+        "content": "<task>\nfirst\n</task>\n\n<working_context>\n{\"id\": \"s1.act\", \"role\": \"assistant\", \"body\": \"status({})\"}\n{\"id\": \"s1.obs\", \"role\": \"observation\", \"body\": \"[status]\\nservice status: degraded since 09:12, queue depth 4,812\"}\n</working_context>\n\n<runtime_status>\nstep 2; task steps used this turn 1 of 60 (edit_context steps are free); model calls this turn 1 of 144\nrequest size: about 2,477 of 29,952 tokens (8% of the limit); budget 32,000\ncontext revision 1, 2 entries\n</runtime_status>\n",
+        "part_kind": "user-prompt"
+       }
+      ],
+      "instructions": null,
+      "kind": "request",
+      "metadata": null,
+      "state": "complete"
+     },
+     {
+      "parts": [
+       {
+        "content": "one",
+        "id": null,
+        "provider_name": null,
+        "provider_details": null,
+        "part_kind": "text"
+       }
+      ],
+      "usage": {
+       "input_tokens": 2482,
+       "cache_write_tokens": 0,
+       "cache_read_tokens": 0,
+       "output_tokens": 10,
+       "input_audio_tokens": 0,
+       "cache_audio_read_tokens": 0,
+       "output_audio_tokens": 0,
+       "details": {},
+       "cost": null
+      },
+      "model_name": "scripted",
+      "kind": "response",
+      "provider_name": null,
+      "provider_url": null,
+      "provider_details": null,
+      "provider_response_id": null,
+      "finish_reason": null,
+      "metadata": null,
+      "state": "complete"
+     }
+    ]
+   },
+   {
+    "prompt": "second",
+    "calls": 1,
+    "output": "two",
+    "all_messages": [
+     {
+      "parts": [
+       {
+        "content": "You are a careful operations assistant. Use the tools to answer.",
+        "dynamic_ref": null,
+        "part_kind": "system-prompt"
+       },
+       {
+        "content": "<task>\nfirst\n\nCurrent request:\nsecond\n</task>\n\n<working_context>\n{\"id\": \"s1.act\", \"role\": \"assistant\", \"body\": \"status({})\"}\n{\"id\": \"s1.obs\", \"role\": \"observation\", \"body\": \"[status]\\nservice status: degraded since 09:12, queue depth 4,812\"}\n{\"id\": \"t1.answer\", \"role\": \"assistant\", \"body\": \"one\", \"protected\": true}\n</working_context>\n\n<runtime_status>\nstep 2; task steps used this turn 0 of 60 (edit_context steps are free); model calls this turn 0 of 144\nrequest size: about 2,528 of 29,952 tokens (8% of the limit); budget 32,000\ncontext revision 2, 3 entries\n</runtime_status>\n",
+        "part_kind": "user-prompt"
+       }
+      ],
+      "instructions": null,
+      "kind": "request",
+      "metadata": null,
+      "state": "complete"
+     },
+     {
+      "parts": [
+       {
+        "content": "two",
+        "id": null,
+        "provider_name": null,
+        "provider_details": null,
+        "part_kind": "text"
+       }
+      ],
+      "usage": {
+       "input_tokens": 2531,
+       "cache_write_tokens": 0,
+       "cache_read_tokens": 0,
+       "output_tokens": 10,
+       "input_audio_tokens": 0,
+       "cache_audio_read_tokens": 0,
+       "output_audio_tokens": 0,
+       "details": {},
+       "cost": null
+      },
+      "model_name": "scripted",
+      "kind": "response",
+      "provider_name": null,
+      "provider_url": null,
+      "provider_details": null,
+      "provider_response_id": null,
+      "finish_reason": null,
+      "metadata": null,
+      "state": "complete"
+     }
+    ]
+   },
+   {
+    "prompt": "third",
+    "calls": 1,
+    "output": "three",
+    "all_messages": [
+     {
+      "parts": [
+       {
+        "content": "You are a careful operations assistant. Use the tools to answer.",
+        "dynamic_ref": null,
+        "part_kind": "system-prompt"
+       },
+       {
+        "content": "<task>\nthird\n</task>\n\n<working_context>\n\n</working_context>\n\n<runtime_status>\nstep 1; task steps used this turn 0 of 60 (edit_context steps are free); model calls this turn 0 of 144\nrequest size: about 2,262 of 29,952 tokens (8% of the limit); budget 32,000\ncontext revision 0, 0 entries\n</runtime_status>\n",
+        "part_kind": "user-prompt"
+       }
+      ],
+      "instructions": null,
+      "kind": "request",
+      "metadata": null,
+      "state": "complete"
+     },
+     {
+      "parts": [
+       {
+        "content": "three",
+        "id": null,
+        "provider_name": null,
+        "provider_details": null,
+        "part_kind": "text"
+       }
+      ],
+      "usage": {
+       "input_tokens": 2398,
+       "cache_write_tokens": 0,
+       "cache_read_tokens": 0,
+       "output_tokens": 10,
+       "input_audio_tokens": 0,
+       "cache_audio_read_tokens": 0,
+       "output_audio_tokens": 0,
+       "details": {},
+       "cost": null
+      },
+      "model_name": "scripted",
+      "kind": "response",
+      "provider_name": null,
+      "provider_url": null,
+      "provider_details": null,
+      "provider_response_id": null,
+      "finish_reason": null,
+      "metadata": null,
+      "state": "complete"
+     }
+    ]
+   }
+  ]
+ }
+}

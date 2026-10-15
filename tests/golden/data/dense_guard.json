@@ -1,0 +1,3229 @@
+{
+ "scenario": "dense_guard",
+ "transcript": {
+  "calls": [
+   {
+    "messages": [
+     {
+      "parts": [
+       {
+        "content": "You are a careful operations assistant. Use the tools to answer.",
+        "dynamic_ref": null,
+        "part_kind": "system-prompt"
+       },
+       {
+        "content": "<task>\nRead densely.\n</task>\n\n<working_context>\n\n</working_context>\n\n<runtime_status>\nstep 1; task steps used this turn 0 of 60 (edit_context steps are free); model calls this turn 0 of 144\nrequest size: about 2,266 of 13,952 tokens (16% of the limit); budget 16,000\ncontext revision 0, 0 entries\n</runtime_status>\n",
+        "part_kind": "user-prompt"
+       }
+      ],
+      "instructions": null,
+      "kind": "request",
+      "metadata": null,
+      "state": "complete"
+     }
+    ],
+    "instructions": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+    "parameters": {
+     "function_tools": [
+      {
+       "name": "status",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the service status.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "greet",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "name": {
+          "description": "Who to greet.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "name"
+        ],
+        "type": "object"
+       },
+       "description": "Send a greeting to an on-call engineer.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "big",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the long build log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "huge",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the full crash dump.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "wide",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the raw trace file.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "logs",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "n": {
+          "description": "The page number, from 1.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "n"
+        ],
+        "type": "object"
+       },
+       "description": "Read one page of the request log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "search",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "query": {
+          "description": "What to look for.",
+          "type": "string"
+         },
+         "limit": {
+          "default": 5,
+          "description": "The most results to return.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "query"
+        ],
+        "type": "object"
+       },
+       "description": "Search the runbook.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "ticket",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "key": {
+          "description": "The ticket key.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "key"
+        ],
+        "type": "object"
+       },
+       "description": "Look up a ticket by key.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "tally",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "items": {
+          "description": "The items.",
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "items"
+        ],
+        "type": "object"
+       },
+       "description": "Count items.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "flaky",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "attempt": {
+          "description": "The attempt number, from 0.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "attempt"
+        ],
+        "type": "object"
+       },
+       "description": "A probe that fails on its first attempt.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "broken",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "A tool whose backend is down.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "snapshot",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Take a dashboard snapshot (an image plus a caption).",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "diagram",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Fetch the topology diagram.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "edit_context",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "ops": {
+          "description": "A list of {\"op\": \"delete\", \"ids\": [...]}, {\"op\": \"replace\", \"id\": ..., \"body\": ...} or\n{\"op\": \"add_note\", \"id\": ..., \"body\": ...}.",
+          "items": {
+           "additionalProperties": true,
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "ops"
+        ],
+        "type": "object"
+       },
+       "description": "Apply operations to your working context, in order.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      }
+     ],
+     "native_tools": [],
+     "tool_visibility": {
+      "status": "visible",
+      "greet": "visible",
+      "big": "visible",
+      "huge": "visible",
+      "wide": "visible",
+      "logs": "visible",
+      "search": "visible",
+      "ticket": "visible",
+      "tally": "visible",
+      "flaky": "visible",
+      "broken": "visible",
+      "snapshot": "visible",
+      "diagram": "visible",
+      "edit_context": "visible"
+     },
+     "revealed_tool_names": [],
+     "output_mode": "text",
+     "output_object": null,
+     "output_tools": [],
+     "prompted_output_template": null,
+     "allow_text_output": true,
+     "allow_image_output": false,
+     "instruction_parts": [
+      {
+       "content": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+       "dynamic": false,
+       "part_kind": "instruction"
+      }
+     ],
+     "thinking": null
+    },
+    "settings": null,
+    "reported_input_tokens": 2389
+   },
+   {
+    "messages": [
+     {
+      "parts": [
+       {
+        "content": "You are a careful operations assistant. Use the tools to answer.",
+        "dynamic_ref": null,
+        "part_kind": "system-prompt"
+       },
+       {
+        "content": "<task>\nRead densely.\n</task>\n\n<working_context>\n{\"id\": \"s1.act\", \"role\": \"assistant\", \"body\": \"logs({\\\"n\\\":1})\"}\n{\"id\": \"s1.obs\", \"role\": \"observation\", \"body\": \"[logs]\\nlog page 1\\n2026-09-02T00:00|node-31|req-0010000|61.51ms|svc-0\\n2026-09-03T07:13|node-32|req-0010001|989.72ms|svc-1\\n2026-09-04T14:26|node-33|req-0010002|917.93ms|svc-2\\n2026-09-05T21:39|node-34|req-0010003|846.14ms|svc-3\\n2026-09-06T04:52|node-35|req-0010004|774.35ms|svc-4\\n2026-09-07T11:05|node-36|req-0010005|702.56ms|svc-5\\n2026-09-08T18:18|node-37|req-0010006|630.77ms|svc-6\\n2026-09-09T01:31|node-38|req-0010007|558.98ms|svc-7\\n2026-09-10T08:44|node-39|req-0010008|487.19ms|svc-8\\n2026-09-11T15:57|node-40|req-0010009|415.40ms|svc-9\\n2026-09-12T22:10|node-41|req-0010010|343.61ms|svc-10\\n2026-09-13T05:23|node-42|req-0010011|271.82ms|svc-11\\n2026-09-14T12:36|node-43|req-0010012|200.03ms|svc-12\\n2026-09-15T19:49|node-44|req-0010013|128.24ms|svc-13\\n2026-09-16T02:02|node-45|req-0010014|56.45ms|svc-14\\n2026-09-17T09:15|node-46|req-0010015|984.66ms|svc-15\\n2026-09-18T16:28|node-47|req-0010016|912.87ms|svc-16\\n2026-09-19T23:41|node-48|req-0010017|841.08ms|svc-17\\n2026-09-20T06:54|node-49|req-0010018|769.29ms|svc-18\\n2026-09-21T13:07|node-50|req-0010019|697.50ms|svc-0\\n2026-09-22T20:20|node-51|req-0010020|625.71ms|svc-1\\n2026-09-23T03:33|node-52|req-0010021|553.92ms|svc-2\\n2026-09-24T10:46|node-53|req-0010022|482.13ms|svc-3\\n2026-09-25T17:59|node-54|req-0010023|410.34ms|svc-4\\n2026-09-26T00:12|node-55|req-0010024|338.55ms|svc-5\\n2026-09-27T07:25|node-56|req-0010025|266.76ms|svc-6\\n2026-09-28T14:38|node-57|req-0010026|194.97ms|svc-7\\n2026-09-01T21:51|node-58|req-0010027|123.18ms|svc-8\\n2026-09-02T04:04|node-59|req-0010028|51.39ms|svc-9\\n2026-09-03T11:17|node-60|req-0010029|979.60ms|svc-10\\n2026-09-04T18:30|node-61|req-0010030|907.81ms|svc-11\\n2026-09-05T01:43|node-62|req-0010031|836.02ms|svc-12\\n2026-09-06T08:56|node-63|req-0010032|764.23ms|svc-13\\n2026-09-07T15:09|node-64|req-0010033|692.44ms|svc-14\\n2026-09-08T22:22|node-65|req-0010034|620.65ms|svc-15\\n2026-09-09T05:35|node-66|req-0010035|548.86ms|svc-16\\n2026-09-10T12:48|node-67|req-0010036|477.07ms|svc-17\\n2026-09-11T19:01|node-68|req-0010037|405.28ms|svc-18\\n2026-09-12T02:14|node-69|req-0010038|333.49ms|svc-0\\n2026-09-13T09:27|node-70|req-0010039|261.70ms|svc-1\\n2026-09-14T16:40|node-71|req-0010040|189.91ms|svc-2\\n2026-09-15T23:53|node-72|req-0010041|118.12ms|svc-3\\n2026-09-16T06:06|node-73|req-0010042|46.33ms|svc-4\\n2026-09-17T13:19|node-74|req-0010043|974.54ms|svc-5\\n2026-09-18T20:32|node-75|req-0010044|902.75ms|svc-6\\n2026-09-19T03:45|node-76|req-0010045|830.96ms|svc-7\\n2026-09-20T10:58|node-77|req-0010046|759.17ms|svc-8\\n2026-09-21T17:11|node-78|req-0010047|687.38ms|svc-9\\n2026-09-22T00:24|node-79|req-0010048|615.59ms|svc-10\\n2026-09-23T07:37|node-80|req-0010049|543.80ms|svc-11\\n2026-09-24T14:50|node-81|req-0010050|472.01ms|svc-12\\n2026-09-25T21:03|node-82|req-0010051|400.22ms|svc-13\\n2026-09-26T04:16|node-83|req-0010052|328.43ms|svc-14\\n2026-09-27T11:29|node-84|req-0010053|256.64ms|svc-15\\n2026-09-28T18:42|node-85|req-0010054|184.85ms|svc-16\\n2026-09-01T01:55|node-86|req-0010055|113.06ms|svc-17\\n2026-09-02T08:08|node-87|req-0010056|41.27ms|svc-18\\n2026-09-03T15:21|node-88|req-0010057|969.48ms|svc-0\\n2026-09-04T22:34|node-89|req-0010058|897.69ms|svc-1\\n2026-09-05T05:47|node-90|req-0010059|825.90ms|svc-2\\n2026-09-06T12:00|node-91|req-0010060|754.11ms|svc-3\\n2026-09-07T19:13|node-92|req-0010061|682.32ms|svc-4\\n2026-09-08T02:26|node-93|req-0010062|610.53ms|svc-5\\n2026-09-09T09:39|node-94|req-0010063|538.74ms|svc-6\\n2026-09-10T16:52|node-95|req-0010064|466.95ms|svc-7\\n2026-09-11T23:05|node-96|req-0010065|395.16ms|svc-8\\n2026-09-12T06:18|node-00|req-0010066|323.37ms|svc-9\\n2026-09-13T13:31|node-01|req-0010067|251.58ms|svc-10\\n2026-09-14T20:44|node-02|req-0010068|179.79ms|svc-11\\n2026-09-15T03:57|node-03|req-0010069|108.00ms|svc-12\\n2026-09-16T10:10|node-04|req-0010070|36.21ms|svc-13\\n2026-09-17T17:23|node-05|req-0010071|964.42ms|svc-14\\n2026-09-18T00:36|node-06|req-0010072|892.63ms|svc-15\\n2026-09-19T07:49|node-07|req-0010073|820.84ms|svc-16\\n2026-09-20T14:02|node-08|req-0010074|749.05ms|svc-17\\n2026-09-21T21:15|node-09|req-0010075|677.26ms|svc-18\\n2026-09-22T04:28|node-10|req-0010076|605.47ms|svc-0\\n2026-09-23T11:41|node-11|req-0010077|533.68ms|svc-1\\n2026-09-24T18:54|node-12|req-0010078|461.89ms|svc-2\\n2026-09-25T01:07|node-13|req-0010079|390.10ms|svc-3\"}\n</working_context>\n\n<runtime_status>\nstep 2; task steps used this turn 1 of 60 (edit_context steps are free); model calls this turn 1 of 144\nrequest size: about 4,193 of 13,952 tokens (30% of the limit); budget 16,000\ncontext revision 1, 2 entries\n</runtime_status>\n",
+        "part_kind": "user-prompt"
+       }
+      ],
+      "instructions": null,
+      "kind": "request",
+      "metadata": null,
+      "state": "complete"
+     }
+    ],
+    "instructions": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+    "parameters": {
+     "function_tools": [
+      {
+       "name": "status",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the service status.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "greet",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "name": {
+          "description": "Who to greet.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "name"
+        ],
+        "type": "object"
+       },
+       "description": "Send a greeting to an on-call engineer.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "big",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the long build log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "huge",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the full crash dump.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "wide",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the raw trace file.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "logs",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "n": {
+          "description": "The page number, from 1.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "n"
+        ],
+        "type": "object"
+       },
+       "description": "Read one page of the request log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "search",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "query": {
+          "description": "What to look for.",
+          "type": "string"
+         },
+         "limit": {
+          "default": 5,
+          "description": "The most results to return.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "query"
+        ],
+        "type": "object"
+       },
+       "description": "Search the runbook.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "ticket",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "key": {
+          "description": "The ticket key.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "key"
+        ],
+        "type": "object"
+       },
+       "description": "Look up a ticket by key.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "tally",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "items": {
+          "description": "The items.",
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "items"
+        ],
+        "type": "object"
+       },
+       "description": "Count items.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "flaky",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "attempt": {
+          "description": "The attempt number, from 0.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "attempt"
+        ],
+        "type": "object"
+       },
+       "description": "A probe that fails on its first attempt.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "broken",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "A tool whose backend is down.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "snapshot",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Take a dashboard snapshot (an image plus a caption).",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "diagram",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Fetch the topology diagram.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "edit_context",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "ops": {
+          "description": "A list of {\"op\": \"delete\", \"ids\": [...]}, {\"op\": \"replace\", \"id\": ..., \"body\": ...} or\n{\"op\": \"add_note\", \"id\": ..., \"body\": ...}.",
+          "items": {
+           "additionalProperties": true,
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "ops"
+        ],
+        "type": "object"
+       },
+       "description": "Apply operations to your working context, in order.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      }
+     ],
+     "native_tools": [],
+     "tool_visibility": {
+      "status": "visible",
+      "greet": "visible",
+      "big": "visible",
+      "huge": "visible",
+      "wide": "visible",
+      "logs": "visible",
+      "search": "visible",
+      "ticket": "visible",
+      "tally": "visible",
+      "flaky": "visible",
+      "broken": "visible",
+      "snapshot": "visible",
+      "diagram": "visible",
+      "edit_context": "visible"
+     },
+     "revealed_tool_names": [],
+     "output_mode": "text",
+     "output_object": null,
+     "output_tools": [],
+     "prompted_output_template": null,
+     "allow_text_output": true,
+     "allow_image_output": false,
+     "instruction_parts": [
+      {
+       "content": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+       "dynamic": false,
+       "part_kind": "instruction"
+      }
+     ],
+     "thinking": null
+    },
+    "settings": null,
+    "reported_input_tokens": 6053
+   },
+   {
+    "messages": [
+     {
+      "parts": [
+       {
+        "content": "You are a careful operations assistant. Use the tools to answer.",
+        "dynamic_ref": null,
+        "part_kind": "system-prompt"
+       },
+       {
+        "content": "<task>\nRead densely.\n</task>\n\n<working_context>\n{\"id\": \"s1.act\", \"role\": \"assistant\", \"body\": \"logs({\\\"n\\\":1})\"}\n{\"id\": \"s1.obs\", \"role\": \"observation\", \"body\": \"[logs]\\nlog page 1\\n2026-09-02T00:00|node-31|req-0010000|61.51ms|svc-0\\n2026-09-03T07:13|node-32|req-0010001|989.72ms|svc-1\\n2026-09-04T14:26|node-33|req-0010002|917.93ms|svc-2\\n2026-09-05T21:39|node-34|req-0010003|846.14ms|svc-3\\n2026-09-06T04:52|node-35|req-0010004|774.35ms|svc-4\\n2026-09-07T11:05|node-36|req-0010005|702.56ms|svc-5\\n2026-09-08T18:18|node-37|req-0010006|630.77ms|svc-6\\n2026-09-09T01:31|node-38|req-0010007|558.98ms|svc-7\\n2026-09-10T08:44|node-39|req-0010008|487.19ms|svc-8\\n2026-09-11T15:57|node-40|req-0010009|415.40ms|svc-9\\n2026-09-12T22:10|node-41|req-0010010|343.61ms|svc-10\\n2026-09-13T05:23|node-42|req-0010011|271.82ms|svc-11\\n2026-09-14T12:36|node-43|req-0010012|200.03ms|svc-12\\n2026-09-15T19:49|node-44|req-0010013|128.24ms|svc-13\\n2026-09-16T02:02|node-45|req-0010014|56.45ms|svc-14\\n2026-09-17T09:15|node-46|req-0010015|984.66ms|svc-15\\n2026-09-18T16:28|node-47|req-0010016|912.87ms|svc-16\\n2026-09-19T23:41|node-48|req-0010017|841.08ms|svc-17\\n2026-09-20T06:54|node-49|req-0010018|769.29ms|svc-18\\n2026-09-21T13:07|node-50|req-0010019|697.50ms|svc-0\\n2026-09-22T20:20|node-51|req-0010020|625.71ms|svc-1\\n2026-09-23T03:33|node-52|req-0010021|553.92ms|svc-2\\n2026-09-24T10:46|node-53|req-0010022|482.13ms|svc-3\\n2026-09-25T17:59|node-54|req-0010023|410.34ms|svc-4\\n2026-09-26T00:12|node-55|req-0010024|338.55ms|svc-5\\n2026-09-27T07:25|node-56|req-0010025|266.76ms|svc-6\\n2026-09-28T14:38|node-57|req-0010026|194.97ms|svc-7\\n2026-09-01T21:51|node-58|req-0010027|123.18ms|svc-8\\n2026-09-02T04:04|node-59|req-0010028|51.39ms|svc-9\\n2026-09-03T11:17|node-60|req-0010029|979.60ms|svc-10\\n2026-09-04T18:30|node-61|req-0010030|907.81ms|svc-11\\n2026-09-05T01:43|node-62|req-0010031|836.02ms|svc-12\\n2026-09-06T08:56|node-63|req-0010032|764.23ms|svc-13\\n2026-09-07T15:09|node-64|req-0010033|692.44ms|svc-14\\n2026-09-08T22:22|node-65|req-0010034|620.65ms|svc-15\\n2026-09-09T05:35|node-66|req-0010035|548.86ms|svc-16\\n2026-09-10T12:48|node-67|req-0010036|477.07ms|svc-17\\n2026-09-11T19:01|node-68|req-0010037|405.28ms|svc-18\\n2026-09-12T02:14|node-69|req-0010038|333.49ms|svc-0\\n2026-09-13T09:27|node-70|req-0010039|261.70ms|svc-1\\n2026-09-14T16:40|node-71|req-0010040|189.91ms|svc-2\\n2026-09-15T23:53|node-72|req-0010041|118.12ms|svc-3\\n2026-09-16T06:06|node-73|req-0010042|46.33ms|svc-4\\n2026-09-17T13:19|node-74|req-0010043|974.54ms|svc-5\\n2026-09-18T20:32|node-75|req-0010044|902.75ms|svc-6\\n2026-09-19T03:45|node-76|req-0010045|830.96ms|svc-7\\n2026-09-20T10:58|node-77|req-0010046|759.17ms|svc-8\\n2026-09-21T17:11|node-78|req-0010047|687.38ms|svc-9\\n2026-09-22T00:24|node-79|req-0010048|615.59ms|svc-10\\n2026-09-23T07:37|node-80|req-0010049|543.80ms|svc-11\\n2026-09-24T14:50|node-81|req-0010050|472.01ms|svc-12\\n2026-09-25T21:03|node-82|req-0010051|400.22ms|svc-13\\n2026-09-26T04:16|node-83|req-0010052|328.43ms|svc-14\\n2026-09-27T11:29|node-84|req-0010053|256.64ms|svc-15\\n2026-09-28T18:42|node-85|req-0010054|184.85ms|svc-16\\n2026-09-01T01:55|node-86|req-0010055|113.06ms|svc-17\\n2026-09-02T08:08|node-87|req-0010056|41.27ms|svc-18\\n2026-09-03T15:21|node-88|req-0010057|969.48ms|svc-0\\n2026-09-04T22:34|node-89|req-0010058|897.69ms|svc-1\\n2026-09-05T05:47|node-90|req-0010059|825.90ms|svc-2\\n2026-09-06T12:00|node-91|req-0010060|754.11ms|svc-3\\n2026-09-07T19:13|node-92|req-0010061|682.32ms|svc-4\\n2026-09-08T02:26|node-93|req-0010062|610.53ms|svc-5\\n2026-09-09T09:39|node-94|req-0010063|538.74ms|svc-6\\n2026-09-10T16:52|node-95|req-0010064|466.95ms|svc-7\\n2026-09-11T23:05|node-96|req-0010065|395.16ms|svc-8\\n2026-09-12T06:18|node-00|req-0010066|323.37ms|svc-9\\n2026-09-13T13:31|node-01|req-0010067|251.58ms|svc-10\\n2026-09-14T20:44|node-02|req-0010068|179.79ms|svc-11\\n2026-09-15T03:57|node-03|req-0010069|108.00ms|svc-12\\n2026-09-16T10:10|node-04|req-0010070|36.21ms|svc-13\\n2026-09-17T17:23|node-05|req-0010071|964.42ms|svc-14\\n2026-09-18T00:36|node-06|req-0010072|892.63ms|svc-15\\n2026-09-19T07:49|node-07|req-0010073|820.84ms|svc-16\\n2026-09-20T14:02|node-08|req-0010074|749.05ms|svc-17\\n2026-09-21T21:15|node-09|req-0010075|677.26ms|svc-18\\n2026-09-22T04:28|node-10|req-0010076|605.47ms|svc-0\\n2026-09-23T11:41|node-11|req-0010077|533.68ms|svc-1\\n2026-09-24T18:54|node-12|req-0010078|461.89ms|svc-2\\n2026-09-25T01:07|node-13|req-0010079|390.10ms|svc-3\"}\n{\"id\": \"s2.act\", \"role\": \"assistant\", \"body\": \"logs({\\\"n\\\":2})\"}\n{\"id\": \"s2.obs\", \"role\": \"observation\", \"body\": \"[logs]\\nlog page 2\\n2026-09-03T00:00|node-62|req-0020000|123.02ms|svc-0\\n2026-09-04T07:13|node-63|req-0020001|51.23ms|svc-1\\n2026-09-05T14:26|node-64|req-0020002|979.44ms|svc-2\\n2026-09-06T21:39|node-65|req-0020003|907.65ms|svc-3\\n2026-09-07T04:52|node-66|req-0020004|835.86ms|svc-4\\n2026-09-08T11:05|node-67|req-0020005|764.07ms|svc-5\\n2026-09-09T18:18|node-68|req-0020006|692.28ms|svc-6\\n2026-09-10T01:31|node-69|req-0020007|620.49ms|svc-7\\n2026-09-11T08:44|node-70|req-0020008|548.70ms|svc-8\\n2026-09-12T15:57|node-71|req-0020009|476.91ms|svc-9\\n2026-09-13T22:10|node-72|req-0020010|405.12ms|svc-10\\n2026-09-14T05:23|node-73|req-0020011|333.33ms|svc-11\\n2026-09-15T12:36|node-74|req-0020012|261.54ms|svc-12\\n2026-09-16T19:49|node-75|req-0020013|189.75ms|svc-13\\n2026-09-17T02:02|node-76|req-0020014|117.96ms|svc-14\\n2026-09-18T09:15|node-77|req-0020015|46.17ms|svc-15\\n2026-09-19T16:28|node-78|req-0020016|974.38ms|svc-16\\n2026-09-20T23:41|node-79|req-0020017|902.59ms|svc-17\\n2026-09-21T06:54|node-80|req-0020018|830.80ms|svc-18\\n2026-09-22T13:07|node-81|req-0020019|759.01ms|svc-0\\n2026-09-23T20:20|node-82|req-0020020|687.22ms|svc-1\\n2026-09-24T03:33|node-83|req-0020021|615.43ms|svc-2\\n2026-09-25T10:46|node-84|req-0020022|543.64ms|svc-3\\n2026-09-26T17:59|node-85|req-0020023|471.85ms|svc-4\\n2026-09-27T00:12|node-86|req-0020024|400.06ms|svc-5\\n2026-09-28T07:25|node-87|req-0020025|328.27ms|svc-6\\n2026-09-01T14:38|node-88|req-0020026|256.48ms|svc-7\\n2026-09-02T21:51|node-89|req-0020027|184.69ms|svc-8\\n2026-09-03T04:04|node-90|req-0020028|112.90ms|svc-9\\n2026-09-04T11:17|node-91|req-0020029|41.11ms|svc-10\\n2026-09-05T18:30|node-92|req-0020030|969.32ms|svc-11\\n2026-09-06T01:43|node-93|req-0020031|897.53ms|svc-12\\n2026-09-07T08:56|node-94|req-0020032|825.74ms|svc-13\\n2026-09-08T15:09|node-95|req-0020033|753.95ms|svc-14\\n2026-09-09T22:22|node-96|req-0020034|682.16ms|svc-15\\n2026-09-10T05:35|node-00|req-0020035|610.37ms|svc-16\\n2026-09-11T12:48|node-01|req-0020036|538.58ms|svc-17\\n2026-09-12T19:01|node-02|req-0020037|466.79ms|svc-18\\n2026-09-13T02:14|node-03|req-0020038|395.00ms|svc-0\\n2026-09-14T09:27|node-04|req-0020039|323.21ms|svc-1\\n2026-09-15T16:40|node-05|req-0020040|251.42ms|svc-2\\n2026-09-16T23:53|node-06|req-0020041|179.63ms|svc-3\\n2026-09-17T06:06|node-07|req-0020042|107.84ms|svc-4\\n2026-09-18T13:19|node-08|req-0020043|36.05ms|svc-5\\n2026-09-19T20:32|node-09|req-0020044|964.26ms|svc-6\\n2026-09-20T03:45|node-10|req-0020045|892.47ms|svc-7\\n2026-09-21T10:58|node-11|req-0020046|820.68ms|svc-8\\n2026-09-22T17:11|node-12|req-0020047|748.89ms|svc-9\\n2026-09-23T00:24|node-13|req-0020048|677.10ms|svc-10\\n2026-09-24T07:37|node-14|req-0020049|605.31ms|svc-11\\n2026-09-25T14:50|node-15|req-0020050|533.52ms|svc-12\\n2026-09-26T21:03|node-16|req-0020051|461.73ms|svc-13\\n2026-09-27T04:16|node-17|req-0020052|389.94ms|svc-14\\n2026-09-28T11:29|node-18|req-0020053|318.15ms|svc-15\\n2026-09-01T18:42|node-19|req-0020054|246.36ms|svc-16\\n2026-09-02T01:55|node-20|req-0020055|174.57ms|svc-17\\n2026-09-03T08:08|node-21|req-0020056|102.78ms|svc-18\\n2026-09-04T15:21|node-22|req-0020057|30.99ms|svc-0\\n2026-09-05T22:34|node-23|req-0020058|959.20ms|svc-1\\n2026-09-06T05:47|node-24|req-0020059|887.41ms|svc-2\\n2026-09-07T12:00|node-25|req-0020060|815.62ms|svc-3\\n2026-09-08T19:13|node-26|req-0020061|743.83ms|svc-4\\n2026-09-09T02:26|node-27|req-0020062|672.04ms|svc-5\\n2026-09-10T09:39|node-28|req-0020063|600.25ms|svc-6\\n2026-09-11T16:52|node-29|req-0020064|528.46ms|svc-7\\n2026-09-12T23:05|node-30|req-0020065|456.67ms|svc-8\\n2026-09-13T06:18|node-31|req-0020066|384.88ms|svc-9\\n2026-09-14T13:31|node-32|req-0020067|313.09ms|svc-10\\n2026-09-15T20:44|node-33|req-0020068|241.30ms|svc-11\\n2026-09-16T03:57|node-34|req-0020069|169.51ms|svc-12\\n2026-09-17T10:10|node-35|req-0020070|97.72ms|svc-13\\n2026-09-18T17:23|node-36|req-0020071|25.93ms|svc-14\\n2026-09-19T00:36|node-37|req-0020072|954.14ms|svc-15\\n2026-09-20T07:49|node-38|req-0020073|882.35ms|svc-16\\n2026-09-21T14:02|node-39|req-0020074|810.56ms|svc-17\\n2026-09-22T21:15|node-40|req-0020075|738.77ms|svc-18\\n2026-09-23T04:28|node-41|req-0020076|666.98ms|svc-0\\n2026-09-24T11:41|node-42|req-0020077|595.19ms|svc-1\\n2026-09-25T18:54|node-43|req-0020078|523.40ms|svc-2\\n2026-09-26T01:07|node-44|req-0020079|451.61ms|svc-3\"}\n</working_context>\n\n<runtime_status>\nstep 3; task steps used this turn 2 of 60 (edit_context steps are free); model calls this turn 2 of 144\nrequest size: about 9,714 of 13,952 tokens (70% of the limit); budget 16,000\ncontext revision 2, 4 entries\n</runtime_status>\n",
+        "part_kind": "user-prompt"
+       }
+      ],
+      "instructions": null,
+      "kind": "request",
+      "metadata": null,
+      "state": "complete"
+     }
+    ],
+    "instructions": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+    "parameters": {
+     "function_tools": [
+      {
+       "name": "status",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the service status.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "greet",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "name": {
+          "description": "Who to greet.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "name"
+        ],
+        "type": "object"
+       },
+       "description": "Send a greeting to an on-call engineer.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "big",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the long build log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "huge",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the full crash dump.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "wide",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the raw trace file.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "logs",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "n": {
+          "description": "The page number, from 1.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "n"
+        ],
+        "type": "object"
+       },
+       "description": "Read one page of the request log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "search",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "query": {
+          "description": "What to look for.",
+          "type": "string"
+         },
+         "limit": {
+          "default": 5,
+          "description": "The most results to return.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "query"
+        ],
+        "type": "object"
+       },
+       "description": "Search the runbook.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "ticket",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "key": {
+          "description": "The ticket key.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "key"
+        ],
+        "type": "object"
+       },
+       "description": "Look up a ticket by key.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "tally",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "items": {
+          "description": "The items.",
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "items"
+        ],
+        "type": "object"
+       },
+       "description": "Count items.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "flaky",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "attempt": {
+          "description": "The attempt number, from 0.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "attempt"
+        ],
+        "type": "object"
+       },
+       "description": "A probe that fails on its first attempt.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "broken",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "A tool whose backend is down.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "snapshot",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Take a dashboard snapshot (an image plus a caption).",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "diagram",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Fetch the topology diagram.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "edit_context",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "ops": {
+          "description": "A list of {\"op\": \"delete\", \"ids\": [...]}, {\"op\": \"replace\", \"id\": ..., \"body\": ...} or\n{\"op\": \"add_note\", \"id\": ..., \"body\": ...}.",
+          "items": {
+           "additionalProperties": true,
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "ops"
+        ],
+        "type": "object"
+       },
+       "description": "Apply operations to your working context, in order.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      }
+     ],
+     "native_tools": [],
+     "tool_visibility": {
+      "status": "visible",
+      "greet": "visible",
+      "big": "visible",
+      "huge": "visible",
+      "wide": "visible",
+      "logs": "visible",
+      "search": "visible",
+      "ticket": "visible",
+      "tally": "visible",
+      "flaky": "visible",
+      "broken": "visible",
+      "snapshot": "visible",
+      "diagram": "visible",
+      "edit_context": "visible"
+     },
+     "revealed_tool_names": [],
+     "output_mode": "text",
+     "output_object": null,
+     "output_tools": [],
+     "prompted_output_template": null,
+     "allow_text_output": true,
+     "allow_image_output": false,
+     "instruction_parts": [
+      {
+       "content": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+       "dynamic": false,
+       "part_kind": "instruction"
+      }
+     ],
+     "thinking": null
+    },
+    "settings": null,
+    "reported_input_tokens": 9717
+   },
+   {
+    "messages": [
+     {
+      "parts": [
+       {
+        "content": "You are a careful operations assistant. Use the tools to answer.",
+        "dynamic_ref": null,
+        "part_kind": "system-prompt"
+       },
+       {
+        "content": "<task>\nRead densely.\n</task>\n\n<working_context>\n{\"id\": \"s1.act\", \"role\": \"assistant\", \"body\": \"logs({\\\"n\\\":1})\"}\n{\"id\": \"s1.obs\", \"role\": \"observation\", \"body\": \"[logs]\\nlog page 1\\n2026-09-02T00:00|node-31|req-0010000|61.51ms|svc-0\\n2026-09-03T07:13|node-32|req-0010001|989.72ms|svc-1\\n2026-09-04T14:26|node-33|req-0010002|917.93ms|svc-2\\n2026-09-05T21:39|node-34|req-0010003|846.14ms|svc-3\\n2026-09-06T04:52|node-35|req-0010004|774.35ms|svc-4\\n2026-09-07T11:05|node-36|req-0010005|702.56ms|svc-5\\n2026-09-08T18:18|node-37|req-0010006|630.77ms|svc-6\\n2026-09-09T01:31|node-38|req-0010007|558.98ms|svc-7\\n2026-09-10T08:44|node-39|req-0010008|487.19ms|svc-8\\n2026-09-11T15:57|node-40|req-0010009|415.40ms|svc-9\\n2026-09-12T22:10|node-41|req-0010010|343.61ms|svc-10\\n2026-09-13T05:23|node-42|req-0010011|271.82ms|svc-11\\n2026-09-14T12:36|node-43|req-0010012|200.03ms|svc-12\\n2026-09-15T19:49|node-44|req-0010013|128.24ms|svc-13\\n2026-09-16T02:02|node-45|req-0010014|56.45ms|svc-14\\n2026-09-17T09:15|node-46|req-0010015|984.66ms|svc-15\\n2026-09-18T16:28|node-47|req-0010016|912.87ms|svc-16\\n2026-09-19T23:41|node-48|req-0010017|841.08ms|svc-17\\n2026-09-20T06:54|node-49|req-0010018|769.29ms|svc-18\\n2026-09-21T13:07|node-50|req-0010019|697.50ms|svc-0\\n2026-09-22T20:20|node-51|req-0010020|625.71ms|svc-1\\n2026-09-23T03:33|node-52|req-0010021|553.92ms|svc-2\\n2026-09-24T10:46|node-53|req-0010022|482.13ms|svc-3\\n2026-09-25T17:59|node-54|req-0010023|410.34ms|svc-4\\n2026-09-26T00:12|node-55|req-0010024|338.55ms|svc-5\\n2026-09-27T07:25|node-56|req-0010025|266.76ms|svc-6\\n2026-09-28T14:38|node-57|req-0010026|194.97ms|svc-7\\n2026-09-01T21:51|node-58|req-0010027|123.18ms|svc-8\\n2026-09-02T04:04|node-59|req-0010028|51.39ms|svc-9\\n2026-09-03T11:17|node-60|req-0010029|979.60ms|svc-10\\n2026-09-04T18:30|node-61|req-0010030|907.81ms|svc-11\\n2026-09-05T01:43|node-62|req-0010031|836.02ms|svc-12\\n2026-09-06T08:56|node-63|req-0010032|764.23ms|svc-13\\n2026-09-07T15:09|node-64|req-0010033|692.44ms|svc-14\\n2026-09-08T22:22|node-65|req-0010034|620.65ms|svc-15\\n2026-09-09T05:35|node-66|req-0010035|548.86ms|svc-16\\n2026-09-10T12:48|node-67|req-0010036|477.07ms|svc-17\\n2026-09-11T19:01|node-68|req-0010037|405.28ms|svc-18\\n2026-09-12T02:14|node-69|req-0010038|333.49ms|svc-0\\n2026-09-13T09:27|node-70|req-0010039|261.70ms|svc-1\\n2026-09-14T16:40|node-71|req-0010040|189.91ms|svc-2\\n2026-09-15T23:53|node-72|req-0010041|118.12ms|svc-3\\n2026-09-16T06:06|node-73|req-0010042|46.33ms|svc-4\\n2026-09-17T13:19|node-74|req-0010043|974.54ms|svc-5\\n2026-09-18T20:32|node-75|req-0010044|902.75ms|svc-6\\n2026-09-19T03:45|node-76|req-0010045|830.96ms|svc-7\\n2026-09-20T10:58|node-77|req-0010046|759.17ms|svc-8\\n2026-09-21T17:11|node-78|req-0010047|687.38ms|svc-9\\n2026-09-22T00:24|node-79|req-0010048|615.59ms|svc-10\\n2026-09-23T07:37|node-80|req-0010049|543.80ms|svc-11\\n2026-09-24T14:50|node-81|req-0010050|472.01ms|svc-12\\n2026-09-25T21:03|node-82|req-0010051|400.22ms|svc-13\\n2026-09-26T04:16|node-83|req-0010052|328.43ms|svc-14\\n2026-09-27T11:29|node-84|req-0010053|256.64ms|svc-15\\n2026-09-28T18:42|node-85|req-0010054|184.85ms|svc-16\\n2026-09-01T01:55|node-86|req-0010055|113.06ms|svc-17\\n2026-09-02T08:08|node-87|req-0010056|41.27ms|svc-18\\n2026-09-03T15:21|node-88|req-0010057|969.48ms|svc-0\\n2026-09-04T22:34|node-89|req-0010058|897.69ms|svc-1\\n2026-09-05T05:47|node-90|req-0010059|825.90ms|svc-2\\n2026-09-06T12:00|node-91|req-0010060|754.11ms|svc-3\\n2026-09-07T19:13|node-92|req-0010061|682.32ms|svc-4\\n2026-09-08T02:26|node-93|req-0010062|610.53ms|svc-5\\n2026-09-09T09:39|node-94|req-0010063|538.74ms|svc-6\\n2026-09-10T16:52|node-95|req-0010064|466.95ms|svc-7\\n2026-09-11T23:05|node-96|req-0010065|395.16ms|svc-8\\n2026-09-12T06:18|node-00|req-0010066|323.37ms|svc-9\\n2026-09-13T13:31|node-01|req-0010067|251.58ms|svc-10\\n2026-09-14T20:44|node-02|req-0010068|179.79ms|svc-11\\n2026-09-15T03:57|node-03|req-0010069|108.00ms|svc-12\\n2026-09-16T10:10|node-04|req-0010070|36.21ms|svc-13\\n2026-09-17T17:23|node-05|req-0010071|964.42ms|svc-14\\n2026-09-18T00:36|node-06|req-0010072|892.63ms|svc-15\\n2026-09-19T07:49|node-07|req-0010073|820.84ms|svc-16\\n2026-09-20T14:02|node-08|req-0010074|749.05ms|svc-17\\n2026-09-21T21:15|node-09|req-0010075|677.26ms|svc-18\\n2026-09-22T04:28|node-10|req-0010076|605.47ms|svc-0\\n2026-09-23T11:41|node-11|req-0010077|533.68ms|svc-1\\n2026-09-24T18:54|node-12|req-0010078|461.89ms|svc-2\\n2026-09-25T01:07|node-13|req-0010079|390.10ms|svc-3\"}\n{\"id\": \"s2.act\", \"role\": \"assistant\", \"body\": \"logs({\\\"n\\\":2})\"}\n{\"id\": \"s2.obs\", \"role\": \"observation\", \"body\": \"[logs]\\nlog page 2\\n2026-09-03T00:00|node-62|req-0020000|123.02ms|svc-0\\n2026-09-04T07:13|node-63|req-0020001|51.23ms|svc-1\\n2026-09-05T14:26|node-64|req-0020002|979.44ms|svc-2\\n2026-09-06T21:39|node-65|req-0020003|907.65ms|svc-3\\n2026-09-07T04:52|node-66|req-0020004|835.86ms|svc-4\\n2026-09-08T11:05|node-67|req-0020005|764.07ms|svc-5\\n2026-09-09T18:18|node-68|req-0020006|692.28ms|svc-6\\n2026-09-10T01:31|node-69|req-0020007|620.49ms|svc-7\\n2026-09-11T08:44|node-70|req-0020008|548.70ms|svc-8\\n2026-09-12T15:57|node-71|req-0020009|476.91ms|svc-9\\n2026-09-13T22:10|node-72|req-0020010|405.12ms|svc-10\\n2026-09-14T05:23|node-73|req-0020011|333.33ms|svc-11\\n2026-09-15T12:36|node-74|req-0020012|261.54ms|svc-12\\n2026-09-16T19:49|node-75|req-0020013|189.75ms|svc-13\\n2026-09-17T02:02|node-76|req-0020014|117.96ms|svc-14\\n2026-09-18T09:15|node-77|req-0020015|46.17ms|svc-15\\n2026-09-19T16:28|node-78|req-0020016|974.38ms|svc-16\\n2026-09-20T23:41|node-79|req-0020017|902.59ms|svc-17\\n2026-09-21T06:54|node-80|req-0020018|830.80ms|svc-18\\n2026-09-22T13:07|node-81|req-0020019|759.01ms|svc-0\\n2026-09-23T20:20|node-82|req-0020020|687.22ms|svc-1\\n2026-09-24T03:33|node-83|req-0020021|615.43ms|svc-2\\n2026-09-25T10:46|node-84|req-0020022|543.64ms|svc-3\\n2026-09-26T17:59|node-85|req-0020023|471.85ms|svc-4\\n2026-09-27T00:12|node-86|req-0020024|400.06ms|svc-5\\n2026-09-28T07:25|node-87|req-0020025|328.27ms|svc-6\\n2026-09-01T14:38|node-88|req-0020026|256.48ms|svc-7\\n2026-09-02T21:51|node-89|req-0020027|184.69ms|svc-8\\n2026-09-03T04:04|node-90|req-0020028|112.90ms|svc-9\\n2026-09-04T11:17|node-91|req-0020029|41.11ms|svc-10\\n2026-09-05T18:30|node-92|req-0020030|969.32ms|svc-11\\n2026-09-06T01:43|node-93|req-0020031|897.53ms|svc-12\\n2026-09-07T08:56|node-94|req-0020032|825.74ms|svc-13\\n2026-09-08T15:09|node-95|req-0020033|753.95ms|svc-14\\n2026-09-09T22:22|node-96|req-0020034|682.16ms|svc-15\\n2026-09-10T05:35|node-00|req-0020035|610.37ms|svc-16\\n2026-09-11T12:48|node-01|req-0020036|538.58ms|svc-17\\n2026-09-12T19:01|node-02|req-0020037|466.79ms|svc-18\\n2026-09-13T02:14|node-03|req-0020038|395.00ms|svc-0\\n2026-09-14T09:27|node-04|req-0020039|323.21ms|svc-1\\n2026-09-15T16:40|node-05|req-0020040|251.42ms|svc-2\\n2026-09-16T23:53|node-06|req-0020041|179.63ms|svc-3\\n2026-09-17T06:06|node-07|req-0020042|107.84ms|svc-4\\n2026-09-18T13:19|node-08|req-0020043|36.05ms|svc-5\\n2026-09-19T20:32|node-09|req-0020044|964.26ms|svc-6\\n2026-09-20T03:45|node-10|req-0020045|892.47ms|svc-7\\n2026-09-21T10:58|node-11|req-0020046|820.68ms|svc-8\\n2026-09-22T17:11|node-12|req-0020047|748.89ms|svc-9\\n2026-09-23T00:24|node-13|req-0020048|677.10ms|svc-10\\n2026-09-24T07:37|node-14|req-0020049|605.31ms|svc-11\\n2026-09-25T14:50|node-15|req-0020050|533.52ms|svc-12\\n2026-09-26T21:03|node-16|req-0020051|461.73ms|svc-13\\n2026-09-27T04:16|node-17|req-0020052|389.94ms|svc-14\\n2026-09-28T11:29|node-18|req-0020053|318.15ms|svc-15\\n2026-09-01T18:42|node-19|req-0020054|246.36ms|svc-16\\n2026-09-02T01:55|node-20|req-0020055|174.57ms|svc-17\\n2026-09-03T08:08|node-21|req-0020056|102.78ms|svc-18\\n2026-09-04T15:21|node-22|req-0020057|30.99ms|svc-0\\n2026-09-05T22:34|node-23|req-0020058|959.20ms|svc-1\\n2026-09-06T05:47|node-24|req-0020059|887.41ms|svc-2\\n2026-09-07T12:00|node-25|req-0020060|815.62ms|svc-3\\n2026-09-08T19:13|node-26|req-0020061|743.83ms|svc-4\\n2026-09-09T02:26|node-27|req-0020062|672.04ms|svc-5\\n2026-09-10T09:39|node-28|req-0020063|600.25ms|svc-6\\n2026-09-11T16:52|node-29|req-0020064|528.46ms|svc-7\\n2026-09-12T23:05|node-30|req-0020065|456.67ms|svc-8\\n2026-09-13T06:18|node-31|req-0020066|384.88ms|svc-9\\n2026-09-14T13:31|node-32|req-0020067|313.09ms|svc-10\\n2026-09-15T20:44|node-33|req-0020068|241.30ms|svc-11\\n2026-09-16T03:57|node-34|req-0020069|169.51ms|svc-12\\n2026-09-17T10:10|node-35|req-0020070|97.72ms|svc-13\\n2026-09-18T17:23|node-36|req-0020071|25.93ms|svc-14\\n2026-09-19T00:36|node-37|req-0020072|954.14ms|svc-15\\n2026-09-20T07:49|node-38|req-0020073|882.35ms|svc-16\\n2026-09-21T14:02|node-39|req-0020074|810.56ms|svc-17\\n2026-09-22T21:15|node-40|req-0020075|738.77ms|svc-18\\n2026-09-23T04:28|node-41|req-0020076|666.98ms|svc-0\\n2026-09-24T11:41|node-42|req-0020077|595.19ms|svc-1\\n2026-09-25T18:54|node-43|req-0020078|523.40ms|svc-2\\n2026-09-26T01:07|node-44|req-0020079|451.61ms|svc-3\"}\n{\"id\": \"s3.act\", \"role\": \"assistant\", \"body\": \"huge({})\\nsearch({\\\"query\\\":\\\"latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression \\\"})\"}\n{\"id\": \"s3.obs\", \"role\": \"observation\", \"body\": \"[huge]\\nHeld back: huge({}), about 17,965 tokens; only 3,869 tokens free under the limit. Tidy your context, then call it again.\\n\\n[search]\\nHeld back: search({\\\"query\\\":\\\"latency regression latency regression latency regression latency regr…), about 260 tokens; only 3,763 tokens free under the limit. Tidy your context, then call it again.\"}\n</working_context>\n\n<runtime_status>\nstep 4; task steps used this turn 3 of 60 (edit_context steps are free); model calls this turn 3 of 144\nrequest size: about 10,324 of 13,952 tokens (74% of the limit); budget 16,000\ncontext revision 3, 6 entries\n</runtime_status>\n",
+        "part_kind": "user-prompt"
+       }
+      ],
+      "instructions": null,
+      "kind": "request",
+      "metadata": null,
+      "state": "complete"
+     }
+    ],
+    "instructions": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+    "parameters": {
+     "function_tools": [
+      {
+       "name": "status",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the service status.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "greet",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "name": {
+          "description": "Who to greet.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "name"
+        ],
+        "type": "object"
+       },
+       "description": "Send a greeting to an on-call engineer.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "big",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the long build log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "huge",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the full crash dump.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "wide",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the raw trace file.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "logs",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "n": {
+          "description": "The page number, from 1.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "n"
+        ],
+        "type": "object"
+       },
+       "description": "Read one page of the request log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "search",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "query": {
+          "description": "What to look for.",
+          "type": "string"
+         },
+         "limit": {
+          "default": 5,
+          "description": "The most results to return.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "query"
+        ],
+        "type": "object"
+       },
+       "description": "Search the runbook.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "ticket",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "key": {
+          "description": "The ticket key.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "key"
+        ],
+        "type": "object"
+       },
+       "description": "Look up a ticket by key.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "tally",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "items": {
+          "description": "The items.",
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "items"
+        ],
+        "type": "object"
+       },
+       "description": "Count items.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "flaky",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "attempt": {
+          "description": "The attempt number, from 0.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "attempt"
+        ],
+        "type": "object"
+       },
+       "description": "A probe that fails on its first attempt.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "broken",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "A tool whose backend is down.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "snapshot",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Take a dashboard snapshot (an image plus a caption).",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "diagram",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Fetch the topology diagram.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "edit_context",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "ops": {
+          "description": "A list of {\"op\": \"delete\", \"ids\": [...]}, {\"op\": \"replace\", \"id\": ..., \"body\": ...} or\n{\"op\": \"add_note\", \"id\": ..., \"body\": ...}.",
+          "items": {
+           "additionalProperties": true,
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "ops"
+        ],
+        "type": "object"
+       },
+       "description": "Apply operations to your working context, in order.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      }
+     ],
+     "native_tools": [],
+     "tool_visibility": {
+      "status": "visible",
+      "greet": "visible",
+      "big": "visible",
+      "huge": "visible",
+      "wide": "visible",
+      "logs": "visible",
+      "search": "visible",
+      "ticket": "visible",
+      "tally": "visible",
+      "flaky": "visible",
+      "broken": "visible",
+      "snapshot": "visible",
+      "diagram": "visible",
+      "edit_context": "visible"
+     },
+     "revealed_tool_names": [],
+     "output_mode": "text",
+     "output_object": null,
+     "output_tools": [],
+     "prompted_output_template": null,
+     "allow_text_output": true,
+     "allow_image_output": false,
+     "instruction_parts": [
+      {
+       "content": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+       "dynamic": false,
+       "part_kind": "instruction"
+      }
+     ],
+     "thinking": null
+    },
+    "settings": null,
+    "reported_input_tokens": 10031
+   },
+   {
+    "messages": [
+     {
+      "parts": [
+       {
+        "content": "You are a careful operations assistant. Use the tools to answer.",
+        "dynamic_ref": null,
+        "part_kind": "system-prompt"
+       },
+       {
+        "content": "<task>\nRead densely.\n</task>\n\n<working_context>\n{\"id\": \"s1.act\", \"role\": \"assistant\", \"body\": \"logs({\\\"n\\\":1})\"}\n{\"id\": \"s1.obs\", \"role\": \"observation\", \"body\": \"[logs]\\nlog page 1\\n2026-09-02T00:00|node-31|req-0010000|61.51ms|svc-0\\n2026-09-03T07:13|node-32|req-0010001|989.72ms|svc-1\\n2026-09-04T14:26|node-33|req-0010002|917.93ms|svc-2\\n2026-09-05T21:39|node-34|req-0010003|846.14ms|svc-3\\n2026-09-06T04:52|node-35|req-0010004|774.35ms|svc-4\\n2026-09-07T11:05|node-36|req-0010005|702.56ms|svc-5\\n2026-09-08T18:18|node-37|req-0010006|630.77ms|svc-6\\n2026-09-09T01:31|node-38|req-0010007|558.98ms|svc-7\\n2026-09-10T08:44|node-39|req-0010008|487.19ms|svc-8\\n2026-09-11T15:57|node-40|req-0010009|415.40ms|svc-9\\n2026-09-12T22:10|node-41|req-0010010|343.61ms|svc-10\\n2026-09-13T05:23|node-42|req-0010011|271.82ms|svc-11\\n2026-09-14T12:36|node-43|req-0010012|200.03ms|svc-12\\n2026-09-15T19:49|node-44|req-0010013|128.24ms|svc-13\\n2026-09-16T02:02|node-45|req-0010014|56.45ms|svc-14\\n2026-09-17T09:15|node-46|req-0010015|984.66ms|svc-15\\n2026-09-18T16:28|node-47|req-0010016|912.87ms|svc-16\\n2026-09-19T23:41|node-48|req-0010017|841.08ms|svc-17\\n2026-09-20T06:54|node-49|req-0010018|769.29ms|svc-18\\n2026-09-21T13:07|node-50|req-0010019|697.50ms|svc-0\\n2026-09-22T20:20|node-51|req-0010020|625.71ms|svc-1\\n2026-09-23T03:33|node-52|req-0010021|553.92ms|svc-2\\n2026-09-24T10:46|node-53|req-0010022|482.13ms|svc-3\\n2026-09-25T17:59|node-54|req-0010023|410.34ms|svc-4\\n2026-09-26T00:12|node-55|req-0010024|338.55ms|svc-5\\n2026-09-27T07:25|node-56|req-0010025|266.76ms|svc-6\\n2026-09-28T14:38|node-57|req-0010026|194.97ms|svc-7\\n2026-09-01T21:51|node-58|req-0010027|123.18ms|svc-8\\n2026-09-02T04:04|node-59|req-0010028|51.39ms|svc-9\\n2026-09-03T11:17|node-60|req-0010029|979.60ms|svc-10\\n2026-09-04T18:30|node-61|req-0010030|907.81ms|svc-11\\n2026-09-05T01:43|node-62|req-0010031|836.02ms|svc-12\\n2026-09-06T08:56|node-63|req-0010032|764.23ms|svc-13\\n2026-09-07T15:09|node-64|req-0010033|692.44ms|svc-14\\n2026-09-08T22:22|node-65|req-0010034|620.65ms|svc-15\\n2026-09-09T05:35|node-66|req-0010035|548.86ms|svc-16\\n2026-09-10T12:48|node-67|req-0010036|477.07ms|svc-17\\n2026-09-11T19:01|node-68|req-0010037|405.28ms|svc-18\\n2026-09-12T02:14|node-69|req-0010038|333.49ms|svc-0\\n2026-09-13T09:27|node-70|req-0010039|261.70ms|svc-1\\n2026-09-14T16:40|node-71|req-0010040|189.91ms|svc-2\\n2026-09-15T23:53|node-72|req-0010041|118.12ms|svc-3\\n2026-09-16T06:06|node-73|req-0010042|46.33ms|svc-4\\n2026-09-17T13:19|node-74|req-0010043|974.54ms|svc-5\\n2026-09-18T20:32|node-75|req-0010044|902.75ms|svc-6\\n2026-09-19T03:45|node-76|req-0010045|830.96ms|svc-7\\n2026-09-20T10:58|node-77|req-0010046|759.17ms|svc-8\\n2026-09-21T17:11|node-78|req-0010047|687.38ms|svc-9\\n2026-09-22T00:24|node-79|req-0010048|615.59ms|svc-10\\n2026-09-23T07:37|node-80|req-0010049|543.80ms|svc-11\\n2026-09-24T14:50|node-81|req-0010050|472.01ms|svc-12\\n2026-09-25T21:03|node-82|req-0010051|400.22ms|svc-13\\n2026-09-26T04:16|node-83|req-0010052|328.43ms|svc-14\\n2026-09-27T11:29|node-84|req-0010053|256.64ms|svc-15\\n2026-09-28T18:42|node-85|req-0010054|184.85ms|svc-16\\n2026-09-01T01:55|node-86|req-0010055|113.06ms|svc-17\\n2026-09-02T08:08|node-87|req-0010056|41.27ms|svc-18\\n2026-09-03T15:21|node-88|req-0010057|969.48ms|svc-0\\n2026-09-04T22:34|node-89|req-0010058|897.69ms|svc-1\\n2026-09-05T05:47|node-90|req-0010059|825.90ms|svc-2\\n2026-09-06T12:00|node-91|req-0010060|754.11ms|svc-3\\n2026-09-07T19:13|node-92|req-0010061|682.32ms|svc-4\\n2026-09-08T02:26|node-93|req-0010062|610.53ms|svc-5\\n2026-09-09T09:39|node-94|req-0010063|538.74ms|svc-6\\n2026-09-10T16:52|node-95|req-0010064|466.95ms|svc-7\\n2026-09-11T23:05|node-96|req-0010065|395.16ms|svc-8\\n2026-09-12T06:18|node-00|req-0010066|323.37ms|svc-9\\n2026-09-13T13:31|node-01|req-0010067|251.58ms|svc-10\\n2026-09-14T20:44|node-02|req-0010068|179.79ms|svc-11\\n2026-09-15T03:57|node-03|req-0010069|108.00ms|svc-12\\n2026-09-16T10:10|node-04|req-0010070|36.21ms|svc-13\\n2026-09-17T17:23|node-05|req-0010071|964.42ms|svc-14\\n2026-09-18T00:36|node-06|req-0010072|892.63ms|svc-15\\n2026-09-19T07:49|node-07|req-0010073|820.84ms|svc-16\\n2026-09-20T14:02|node-08|req-0010074|749.05ms|svc-17\\n2026-09-21T21:15|node-09|req-0010075|677.26ms|svc-18\\n2026-09-22T04:28|node-10|req-0010076|605.47ms|svc-0\\n2026-09-23T11:41|node-11|req-0010077|533.68ms|svc-1\\n2026-09-24T18:54|node-12|req-0010078|461.89ms|svc-2\\n2026-09-25T01:07|node-13|req-0010079|390.10ms|svc-3\"}\n{\"id\": \"s2.act\", \"role\": \"assistant\", \"body\": \"logs({\\\"n\\\":2})\"}\n{\"id\": \"s2.obs\", \"role\": \"observation\", \"body\": \"[logs]\\nlog page 2\\n2026-09-03T00:00|node-62|req-0020000|123.02ms|svc-0\\n2026-09-04T07:13|node-63|req-0020001|51.23ms|svc-1\\n2026-09-05T14:26|node-64|req-0020002|979.44ms|svc-2\\n2026-09-06T21:39|node-65|req-0020003|907.65ms|svc-3\\n2026-09-07T04:52|node-66|req-0020004|835.86ms|svc-4\\n2026-09-08T11:05|node-67|req-0020005|764.07ms|svc-5\\n2026-09-09T18:18|node-68|req-0020006|692.28ms|svc-6\\n2026-09-10T01:31|node-69|req-0020007|620.49ms|svc-7\\n2026-09-11T08:44|node-70|req-0020008|548.70ms|svc-8\\n2026-09-12T15:57|node-71|req-0020009|476.91ms|svc-9\\n2026-09-13T22:10|node-72|req-0020010|405.12ms|svc-10\\n2026-09-14T05:23|node-73|req-0020011|333.33ms|svc-11\\n2026-09-15T12:36|node-74|req-0020012|261.54ms|svc-12\\n2026-09-16T19:49|node-75|req-0020013|189.75ms|svc-13\\n2026-09-17T02:02|node-76|req-0020014|117.96ms|svc-14\\n2026-09-18T09:15|node-77|req-0020015|46.17ms|svc-15\\n2026-09-19T16:28|node-78|req-0020016|974.38ms|svc-16\\n2026-09-20T23:41|node-79|req-0020017|902.59ms|svc-17\\n2026-09-21T06:54|node-80|req-0020018|830.80ms|svc-18\\n2026-09-22T13:07|node-81|req-0020019|759.01ms|svc-0\\n2026-09-23T20:20|node-82|req-0020020|687.22ms|svc-1\\n2026-09-24T03:33|node-83|req-0020021|615.43ms|svc-2\\n2026-09-25T10:46|node-84|req-0020022|543.64ms|svc-3\\n2026-09-26T17:59|node-85|req-0020023|471.85ms|svc-4\\n2026-09-27T00:12|node-86|req-0020024|400.06ms|svc-5\\n2026-09-28T07:25|node-87|req-0020025|328.27ms|svc-6\\n2026-09-01T14:38|node-88|req-0020026|256.48ms|svc-7\\n2026-09-02T21:51|node-89|req-0020027|184.69ms|svc-8\\n2026-09-03T04:04|node-90|req-0020028|112.90ms|svc-9\\n2026-09-04T11:17|node-91|req-0020029|41.11ms|svc-10\\n2026-09-05T18:30|node-92|req-0020030|969.32ms|svc-11\\n2026-09-06T01:43|node-93|req-0020031|897.53ms|svc-12\\n2026-09-07T08:56|node-94|req-0020032|825.74ms|svc-13\\n2026-09-08T15:09|node-95|req-0020033|753.95ms|svc-14\\n2026-09-09T22:22|node-96|req-0020034|682.16ms|svc-15\\n2026-09-10T05:35|node-00|req-0020035|610.37ms|svc-16\\n2026-09-11T12:48|node-01|req-0020036|538.58ms|svc-17\\n2026-09-12T19:01|node-02|req-0020037|466.79ms|svc-18\\n2026-09-13T02:14|node-03|req-0020038|395.00ms|svc-0\\n2026-09-14T09:27|node-04|req-0020039|323.21ms|svc-1\\n2026-09-15T16:40|node-05|req-0020040|251.42ms|svc-2\\n2026-09-16T23:53|node-06|req-0020041|179.63ms|svc-3\\n2026-09-17T06:06|node-07|req-0020042|107.84ms|svc-4\\n2026-09-18T13:19|node-08|req-0020043|36.05ms|svc-5\\n2026-09-19T20:32|node-09|req-0020044|964.26ms|svc-6\\n2026-09-20T03:45|node-10|req-0020045|892.47ms|svc-7\\n2026-09-21T10:58|node-11|req-0020046|820.68ms|svc-8\\n2026-09-22T17:11|node-12|req-0020047|748.89ms|svc-9\\n2026-09-23T00:24|node-13|req-0020048|677.10ms|svc-10\\n2026-09-24T07:37|node-14|req-0020049|605.31ms|svc-11\\n2026-09-25T14:50|node-15|req-0020050|533.52ms|svc-12\\n2026-09-26T21:03|node-16|req-0020051|461.73ms|svc-13\\n2026-09-27T04:16|node-17|req-0020052|389.94ms|svc-14\\n2026-09-28T11:29|node-18|req-0020053|318.15ms|svc-15\\n2026-09-01T18:42|node-19|req-0020054|246.36ms|svc-16\\n2026-09-02T01:55|node-20|req-0020055|174.57ms|svc-17\\n2026-09-03T08:08|node-21|req-0020056|102.78ms|svc-18\\n2026-09-04T15:21|node-22|req-0020057|30.99ms|svc-0\\n2026-09-05T22:34|node-23|req-0020058|959.20ms|svc-1\\n2026-09-06T05:47|node-24|req-0020059|887.41ms|svc-2\\n2026-09-07T12:00|node-25|req-0020060|815.62ms|svc-3\\n2026-09-08T19:13|node-26|req-0020061|743.83ms|svc-4\\n2026-09-09T02:26|node-27|req-0020062|672.04ms|svc-5\\n2026-09-10T09:39|node-28|req-0020063|600.25ms|svc-6\\n2026-09-11T16:52|node-29|req-0020064|528.46ms|svc-7\\n2026-09-12T23:05|node-30|req-0020065|456.67ms|svc-8\\n2026-09-13T06:18|node-31|req-0020066|384.88ms|svc-9\\n2026-09-14T13:31|node-32|req-0020067|313.09ms|svc-10\\n2026-09-15T20:44|node-33|req-0020068|241.30ms|svc-11\\n2026-09-16T03:57|node-34|req-0020069|169.51ms|svc-12\\n2026-09-17T10:10|node-35|req-0020070|97.72ms|svc-13\\n2026-09-18T17:23|node-36|req-0020071|25.93ms|svc-14\\n2026-09-19T00:36|node-37|req-0020072|954.14ms|svc-15\\n2026-09-20T07:49|node-38|req-0020073|882.35ms|svc-16\\n2026-09-21T14:02|node-39|req-0020074|810.56ms|svc-17\\n2026-09-22T21:15|node-40|req-0020075|738.77ms|svc-18\\n2026-09-23T04:28|node-41|req-0020076|666.98ms|svc-0\\n2026-09-24T11:41|node-42|req-0020077|595.19ms|svc-1\\n2026-09-25T18:54|node-43|req-0020078|523.40ms|svc-2\\n2026-09-26T01:07|node-44|req-0020079|451.61ms|svc-3\"}\n{\"id\": \"s3.act\", \"role\": \"assistant\", \"body\": \"huge({})\\nsearch({\\\"query\\\":\\\"latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression \\\"})\"}\n{\"id\": \"s3.obs\", \"role\": \"observation\", \"body\": \"[huge]\\nHeld back: huge({}), about 17,965 tokens; only 3,869 tokens free under the limit. Tidy your context, then call it again.\\n\\n[search]\\nHeld back: search({\\\"query\\\":\\\"latency regression latency regression latency regression latency regr…), about 260 tokens; only 3,763 tokens free under the limit. Tidy your context, then call it again.\"}\n{\"id\": \"s4.act\", \"role\": \"assistant\", \"body\": \"search({\\\"query\\\":\\\"latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression \\\"})\"}\n{\"id\": \"s4.obs\", \"role\": \"observation\", \"body\": \"[search]\\n3 runbook hits for 'latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression ': restart, drain, rollback\"}\n</working_context>\n\n<runtime_status>\nstep 5; task steps used this turn 4 of 60 (edit_context steps are free); model calls this turn 4 of 144\nrequest size: about 10,573 of 13,952 tokens (76% of the limit); budget 16,000\ncontext revision 4, 8 entries\n</runtime_status>\n",
+        "part_kind": "user-prompt"
+       }
+      ],
+      "instructions": null,
+      "kind": "request",
+      "metadata": null,
+      "state": "complete"
+     }
+    ],
+    "instructions": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+    "parameters": {
+     "function_tools": [
+      {
+       "name": "status",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the service status.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "greet",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "name": {
+          "description": "Who to greet.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "name"
+        ],
+        "type": "object"
+       },
+       "description": "Send a greeting to an on-call engineer.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "big",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the long build log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "huge",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the full crash dump.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "wide",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the raw trace file.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "logs",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "n": {
+          "description": "The page number, from 1.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "n"
+        ],
+        "type": "object"
+       },
+       "description": "Read one page of the request log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "search",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "query": {
+          "description": "What to look for.",
+          "type": "string"
+         },
+         "limit": {
+          "default": 5,
+          "description": "The most results to return.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "query"
+        ],
+        "type": "object"
+       },
+       "description": "Search the runbook.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "ticket",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "key": {
+          "description": "The ticket key.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "key"
+        ],
+        "type": "object"
+       },
+       "description": "Look up a ticket by key.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "tally",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "items": {
+          "description": "The items.",
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "items"
+        ],
+        "type": "object"
+       },
+       "description": "Count items.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "flaky",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "attempt": {
+          "description": "The attempt number, from 0.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "attempt"
+        ],
+        "type": "object"
+       },
+       "description": "A probe that fails on its first attempt.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "broken",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "A tool whose backend is down.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "snapshot",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Take a dashboard snapshot (an image plus a caption).",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "diagram",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Fetch the topology diagram.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "edit_context",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "ops": {
+          "description": "A list of {\"op\": \"delete\", \"ids\": [...]}, {\"op\": \"replace\", \"id\": ..., \"body\": ...} or\n{\"op\": \"add_note\", \"id\": ..., \"body\": ...}.",
+          "items": {
+           "additionalProperties": true,
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "ops"
+        ],
+        "type": "object"
+       },
+       "description": "Apply operations to your working context, in order.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      }
+     ],
+     "native_tools": [],
+     "tool_visibility": {
+      "status": "visible",
+      "greet": "visible",
+      "big": "visible",
+      "huge": "visible",
+      "wide": "visible",
+      "logs": "visible",
+      "search": "visible",
+      "ticket": "visible",
+      "tally": "visible",
+      "flaky": "visible",
+      "broken": "visible",
+      "snapshot": "visible",
+      "diagram": "visible",
+      "edit_context": "visible"
+     },
+     "revealed_tool_names": [],
+     "output_mode": "text",
+     "output_object": null,
+     "output_tools": [],
+     "prompted_output_template": null,
+     "allow_text_output": true,
+     "allow_image_output": false,
+     "instruction_parts": [
+      {
+       "content": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+       "dynamic": false,
+       "part_kind": "instruction"
+      }
+     ],
+     "thinking": null
+    },
+    "settings": null,
+    "reported_input_tokens": 10312
+   },
+   {
+    "messages": [
+     {
+      "parts": [
+       {
+        "content": "You are a careful operations assistant. Use the tools to answer.",
+        "dynamic_ref": null,
+        "part_kind": "system-prompt"
+       },
+       {
+        "content": "<task>\nRead densely.\n</task>\n\n<working_context>\n{\"id\": \"s1.act\", \"role\": \"assistant\", \"body\": \"logs({\\\"n\\\":1})\"}\n{\"id\": \"s1.obs\", \"role\": \"observation\", \"body\": \"[logs]\\nlog page 1\\n2026-09-02T00:00|node-31|req-0010000|61.51ms|svc-0\\n2026-09-03T07:13|node-32|req-0010001|989.72ms|svc-1\\n2026-09-04T14:26|node-33|req-0010002|917.93ms|svc-2\\n2026-09-05T21:39|node-34|req-0010003|846.14ms|svc-3\\n2026-09-06T04:52|node-35|req-0010004|774.35ms|svc-4\\n2026-09-07T11:05|node-36|req-0010005|702.56ms|svc-5\\n2026-09-08T18:18|node-37|req-0010006|630.77ms|svc-6\\n2026-09-09T01:31|node-38|req-0010007|558.98ms|svc-7\\n2026-09-10T08:44|node-39|req-0010008|487.19ms|svc-8\\n2026-09-11T15:57|node-40|req-0010009|415.40ms|svc-9\\n2026-09-12T22:10|node-41|req-0010010|343.61ms|svc-10\\n2026-09-13T05:23|node-42|req-0010011|271.82ms|svc-11\\n2026-09-14T12:36|node-43|req-0010012|200.03ms|svc-12\\n2026-09-15T19:49|node-44|req-0010013|128.24ms|svc-13\\n2026-09-16T02:02|node-45|req-0010014|56.45ms|svc-14\\n2026-09-17T09:15|node-46|req-0010015|984.66ms|svc-15\\n2026-09-18T16:28|node-47|req-0010016|912.87ms|svc-16\\n2026-09-19T23:41|node-48|req-0010017|841.08ms|svc-17\\n2026-09-20T06:54|node-49|req-0010018|769.29ms|svc-18\\n2026-09-21T13:07|node-50|req-0010019|697.50ms|svc-0\\n2026-09-22T20:20|node-51|req-0010020|625.71ms|svc-1\\n2026-09-23T03:33|node-52|req-0010021|553.92ms|svc-2\\n2026-09-24T10:46|node-53|req-0010022|482.13ms|svc-3\\n2026-09-25T17:59|node-54|req-0010023|410.34ms|svc-4\\n2026-09-26T00:12|node-55|req-0010024|338.55ms|svc-5\\n2026-09-27T07:25|node-56|req-0010025|266.76ms|svc-6\\n2026-09-28T14:38|node-57|req-0010026|194.97ms|svc-7\\n2026-09-01T21:51|node-58|req-0010027|123.18ms|svc-8\\n2026-09-02T04:04|node-59|req-0010028|51.39ms|svc-9\\n2026-09-03T11:17|node-60|req-0010029|979.60ms|svc-10\\n2026-09-04T18:30|node-61|req-0010030|907.81ms|svc-11\\n2026-09-05T01:43|node-62|req-0010031|836.02ms|svc-12\\n2026-09-06T08:56|node-63|req-0010032|764.23ms|svc-13\\n2026-09-07T15:09|node-64|req-0010033|692.44ms|svc-14\\n2026-09-08T22:22|node-65|req-0010034|620.65ms|svc-15\\n2026-09-09T05:35|node-66|req-0010035|548.86ms|svc-16\\n2026-09-10T12:48|node-67|req-0010036|477.07ms|svc-17\\n2026-09-11T19:01|node-68|req-0010037|405.28ms|svc-18\\n2026-09-12T02:14|node-69|req-0010038|333.49ms|svc-0\\n2026-09-13T09:27|node-70|req-0010039|261.70ms|svc-1\\n2026-09-14T16:40|node-71|req-0010040|189.91ms|svc-2\\n2026-09-15T23:53|node-72|req-0010041|118.12ms|svc-3\\n2026-09-16T06:06|node-73|req-0010042|46.33ms|svc-4\\n2026-09-17T13:19|node-74|req-0010043|974.54ms|svc-5\\n2026-09-18T20:32|node-75|req-0010044|902.75ms|svc-6\\n2026-09-19T03:45|node-76|req-0010045|830.96ms|svc-7\\n2026-09-20T10:58|node-77|req-0010046|759.17ms|svc-8\\n2026-09-21T17:11|node-78|req-0010047|687.38ms|svc-9\\n2026-09-22T00:24|node-79|req-0010048|615.59ms|svc-10\\n2026-09-23T07:37|node-80|req-0010049|543.80ms|svc-11\\n2026-09-24T14:50|node-81|req-0010050|472.01ms|svc-12\\n2026-09-25T21:03|node-82|req-0010051|400.22ms|svc-13\\n2026-09-26T04:16|node-83|req-0010052|328.43ms|svc-14\\n2026-09-27T11:29|node-84|req-0010053|256.64ms|svc-15\\n2026-09-28T18:42|node-85|req-0010054|184.85ms|svc-16\\n2026-09-01T01:55|node-86|req-0010055|113.06ms|svc-17\\n2026-09-02T08:08|node-87|req-0010056|41.27ms|svc-18\\n2026-09-03T15:21|node-88|req-0010057|969.48ms|svc-0\\n2026-09-04T22:34|node-89|req-0010058|897.69ms|svc-1\\n2026-09-05T05:47|node-90|req-0010059|825.90ms|svc-2\\n2026-09-06T12:00|node-91|req-0010060|754.11ms|svc-3\\n2026-09-07T19:13|node-92|req-0010061|682.32ms|svc-4\\n2026-09-08T02:26|node-93|req-0010062|610.53ms|svc-5\\n2026-09-09T09:39|node-94|req-0010063|538.74ms|svc-6\\n2026-09-10T16:52|node-95|req-0010064|466.95ms|svc-7\\n2026-09-11T23:05|node-96|req-0010065|395.16ms|svc-8\\n2026-09-12T06:18|node-00|req-0010066|323.37ms|svc-9\\n2026-09-13T13:31|node-01|req-0010067|251.58ms|svc-10\\n2026-09-14T20:44|node-02|req-0010068|179.79ms|svc-11\\n2026-09-15T03:57|node-03|req-0010069|108.00ms|svc-12\\n2026-09-16T10:10|node-04|req-0010070|36.21ms|svc-13\\n2026-09-17T17:23|node-05|req-0010071|964.42ms|svc-14\\n2026-09-18T00:36|node-06|req-0010072|892.63ms|svc-15\\n2026-09-19T07:49|node-07|req-0010073|820.84ms|svc-16\\n2026-09-20T14:02|node-08|req-0010074|749.05ms|svc-17\\n2026-09-21T21:15|node-09|req-0010075|677.26ms|svc-18\\n2026-09-22T04:28|node-10|req-0010076|605.47ms|svc-0\\n2026-09-23T11:41|node-11|req-0010077|533.68ms|svc-1\\n2026-09-24T18:54|node-12|req-0010078|461.89ms|svc-2\\n2026-09-25T01:07|node-13|req-0010079|390.10ms|svc-3\"}\n{\"id\": \"s2.act\", \"role\": \"assistant\", \"body\": \"logs({\\\"n\\\":2})\"}\n{\"id\": \"s2.obs\", \"role\": \"observation\", \"body\": \"[logs]\\nlog page 2\\n2026-09-03T00:00|node-62|req-0020000|123.02ms|svc-0\\n2026-09-04T07:13|node-63|req-0020001|51.23ms|svc-1\\n2026-09-05T14:26|node-64|req-0020002|979.44ms|svc-2\\n2026-09-06T21:39|node-65|req-0020003|907.65ms|svc-3\\n2026-09-07T04:52|node-66|req-0020004|835.86ms|svc-4\\n2026-09-08T11:05|node-67|req-0020005|764.07ms|svc-5\\n2026-09-09T18:18|node-68|req-0020006|692.28ms|svc-6\\n2026-09-10T01:31|node-69|req-0020007|620.49ms|svc-7\\n2026-09-11T08:44|node-70|req-0020008|548.70ms|svc-8\\n2026-09-12T15:57|node-71|req-0020009|476.91ms|svc-9\\n2026-09-13T22:10|node-72|req-0020010|405.12ms|svc-10\\n2026-09-14T05:23|node-73|req-0020011|333.33ms|svc-11\\n2026-09-15T12:36|node-74|req-0020012|261.54ms|svc-12\\n2026-09-16T19:49|node-75|req-0020013|189.75ms|svc-13\\n2026-09-17T02:02|node-76|req-0020014|117.96ms|svc-14\\n2026-09-18T09:15|node-77|req-0020015|46.17ms|svc-15\\n2026-09-19T16:28|node-78|req-0020016|974.38ms|svc-16\\n2026-09-20T23:41|node-79|req-0020017|902.59ms|svc-17\\n2026-09-21T06:54|node-80|req-0020018|830.80ms|svc-18\\n2026-09-22T13:07|node-81|req-0020019|759.01ms|svc-0\\n2026-09-23T20:20|node-82|req-0020020|687.22ms|svc-1\\n2026-09-24T03:33|node-83|req-0020021|615.43ms|svc-2\\n2026-09-25T10:46|node-84|req-0020022|543.64ms|svc-3\\n2026-09-26T17:59|node-85|req-0020023|471.85ms|svc-4\\n2026-09-27T00:12|node-86|req-0020024|400.06ms|svc-5\\n2026-09-28T07:25|node-87|req-0020025|328.27ms|svc-6\\n2026-09-01T14:38|node-88|req-0020026|256.48ms|svc-7\\n2026-09-02T21:51|node-89|req-0020027|184.69ms|svc-8\\n2026-09-03T04:04|node-90|req-0020028|112.90ms|svc-9\\n2026-09-04T11:17|node-91|req-0020029|41.11ms|svc-10\\n2026-09-05T18:30|node-92|req-0020030|969.32ms|svc-11\\n2026-09-06T01:43|node-93|req-0020031|897.53ms|svc-12\\n2026-09-07T08:56|node-94|req-0020032|825.74ms|svc-13\\n2026-09-08T15:09|node-95|req-0020033|753.95ms|svc-14\\n2026-09-09T22:22|node-96|req-0020034|682.16ms|svc-15\\n2026-09-10T05:35|node-00|req-0020035|610.37ms|svc-16\\n2026-09-11T12:48|node-01|req-0020036|538.58ms|svc-17\\n2026-09-12T19:01|node-02|req-0020037|466.79ms|svc-18\\n2026-09-13T02:14|node-03|req-0020038|395.00ms|svc-0\\n2026-09-14T09:27|node-04|req-0020039|323.21ms|svc-1\\n2026-09-15T16:40|node-05|req-0020040|251.42ms|svc-2\\n2026-09-16T23:53|node-06|req-0020041|179.63ms|svc-3\\n2026-09-17T06:06|node-07|req-0020042|107.84ms|svc-4\\n2026-09-18T13:19|node-08|req-0020043|36.05ms|svc-5\\n2026-09-19T20:32|node-09|req-0020044|964.26ms|svc-6\\n2026-09-20T03:45|node-10|req-0020045|892.47ms|svc-7\\n2026-09-21T10:58|node-11|req-0020046|820.68ms|svc-8\\n2026-09-22T17:11|node-12|req-0020047|748.89ms|svc-9\\n2026-09-23T00:24|node-13|req-0020048|677.10ms|svc-10\\n2026-09-24T07:37|node-14|req-0020049|605.31ms|svc-11\\n2026-09-25T14:50|node-15|req-0020050|533.52ms|svc-12\\n2026-09-26T21:03|node-16|req-0020051|461.73ms|svc-13\\n2026-09-27T04:16|node-17|req-0020052|389.94ms|svc-14\\n2026-09-28T11:29|node-18|req-0020053|318.15ms|svc-15\\n2026-09-01T18:42|node-19|req-0020054|246.36ms|svc-16\\n2026-09-02T01:55|node-20|req-0020055|174.57ms|svc-17\\n2026-09-03T08:08|node-21|req-0020056|102.78ms|svc-18\\n2026-09-04T15:21|node-22|req-0020057|30.99ms|svc-0\\n2026-09-05T22:34|node-23|req-0020058|959.20ms|svc-1\\n2026-09-06T05:47|node-24|req-0020059|887.41ms|svc-2\\n2026-09-07T12:00|node-25|req-0020060|815.62ms|svc-3\\n2026-09-08T19:13|node-26|req-0020061|743.83ms|svc-4\\n2026-09-09T02:26|node-27|req-0020062|672.04ms|svc-5\\n2026-09-10T09:39|node-28|req-0020063|600.25ms|svc-6\\n2026-09-11T16:52|node-29|req-0020064|528.46ms|svc-7\\n2026-09-12T23:05|node-30|req-0020065|456.67ms|svc-8\\n2026-09-13T06:18|node-31|req-0020066|384.88ms|svc-9\\n2026-09-14T13:31|node-32|req-0020067|313.09ms|svc-10\\n2026-09-15T20:44|node-33|req-0020068|241.30ms|svc-11\\n2026-09-16T03:57|node-34|req-0020069|169.51ms|svc-12\\n2026-09-17T10:10|node-35|req-0020070|97.72ms|svc-13\\n2026-09-18T17:23|node-36|req-0020071|25.93ms|svc-14\\n2026-09-19T00:36|node-37|req-0020072|954.14ms|svc-15\\n2026-09-20T07:49|node-38|req-0020073|882.35ms|svc-16\\n2026-09-21T14:02|node-39|req-0020074|810.56ms|svc-17\\n2026-09-22T21:15|node-40|req-0020075|738.77ms|svc-18\\n2026-09-23T04:28|node-41|req-0020076|666.98ms|svc-0\\n2026-09-24T11:41|node-42|req-0020077|595.19ms|svc-1\\n2026-09-25T18:54|node-43|req-0020078|523.40ms|svc-2\\n2026-09-26T01:07|node-44|req-0020079|451.61ms|svc-3\"}\n{\"id\": \"s3.act\", \"role\": \"assistant\", \"body\": \"huge({})\\nsearch({\\\"query\\\":\\\"latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression \\\"})\"}\n{\"id\": \"s3.obs\", \"role\": \"observation\", \"body\": \"[huge]\\nHeld back: huge({}), about 17,965 tokens; only 3,869 tokens free under the limit. Tidy your context, then call it again.\\n\\n[search]\\nHeld back: search({\\\"query\\\":\\\"latency regression latency regression latency regression latency regr…), about 260 tokens; only 3,763 tokens free under the limit. Tidy your context, then call it again.\"}\n{\"id\": \"s4.act\", \"role\": \"assistant\", \"body\": \"search({\\\"query\\\":\\\"latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression \\\"})\"}\n{\"id\": \"s4.obs\", \"role\": \"observation\", \"body\": \"[search]\\n3 runbook hits for 'latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression ': restart, drain, rollback\"}\n{\"id\": \"s5.act\", \"role\": \"assistant\", \"body\": \"search({\\\"query\\\":\\\"latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression \\\"})\"}\n{\"id\": \"s5.obs\", \"role\": \"observation\", \"body\": \"[search]\\n3 runbook hits for 'latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression ': restart, drain, rollback\"}\n</working_context>\n\n<runtime_status>\nstep 6; task steps used this turn 5 of 60 (edit_context steps are free); model calls this turn 5 of 144\nrequest size: about 10,855 of 13,952 tokens (78% of the limit); budget 16,000\ncontext revision 5, 10 entries\n</runtime_status>\n",
+        "part_kind": "user-prompt"
+       }
+      ],
+      "instructions": null,
+      "kind": "request",
+      "metadata": null,
+      "state": "complete"
+     }
+    ],
+    "instructions": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+    "parameters": {
+     "function_tools": [
+      {
+       "name": "status",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the service status.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "greet",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "name": {
+          "description": "Who to greet.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "name"
+        ],
+        "type": "object"
+       },
+       "description": "Send a greeting to an on-call engineer.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "big",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the long build log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "huge",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the full crash dump.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "wide",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the raw trace file.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "logs",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "n": {
+          "description": "The page number, from 1.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "n"
+        ],
+        "type": "object"
+       },
+       "description": "Read one page of the request log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "search",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "query": {
+          "description": "What to look for.",
+          "type": "string"
+         },
+         "limit": {
+          "default": 5,
+          "description": "The most results to return.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "query"
+        ],
+        "type": "object"
+       },
+       "description": "Search the runbook.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "ticket",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "key": {
+          "description": "The ticket key.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "key"
+        ],
+        "type": "object"
+       },
+       "description": "Look up a ticket by key.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "tally",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "items": {
+          "description": "The items.",
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "items"
+        ],
+        "type": "object"
+       },
+       "description": "Count items.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "flaky",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "attempt": {
+          "description": "The attempt number, from 0.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "attempt"
+        ],
+        "type": "object"
+       },
+       "description": "A probe that fails on its first attempt.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "broken",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "A tool whose backend is down.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "snapshot",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Take a dashboard snapshot (an image plus a caption).",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "diagram",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Fetch the topology diagram.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "edit_context",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "ops": {
+          "description": "A list of {\"op\": \"delete\", \"ids\": [...]}, {\"op\": \"replace\", \"id\": ..., \"body\": ...} or\n{\"op\": \"add_note\", \"id\": ..., \"body\": ...}.",
+          "items": {
+           "additionalProperties": true,
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "ops"
+        ],
+        "type": "object"
+       },
+       "description": "Apply operations to your working context, in order.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      }
+     ],
+     "native_tools": [],
+     "tool_visibility": {
+      "status": "visible",
+      "greet": "visible",
+      "big": "visible",
+      "huge": "visible",
+      "wide": "visible",
+      "logs": "visible",
+      "search": "visible",
+      "ticket": "visible",
+      "tally": "visible",
+      "flaky": "visible",
+      "broken": "visible",
+      "snapshot": "visible",
+      "diagram": "visible",
+      "edit_context": "visible"
+     },
+     "revealed_tool_names": [],
+     "output_mode": "text",
+     "output_object": null,
+     "output_tools": [],
+     "prompted_output_template": null,
+     "allow_text_output": true,
+     "allow_image_output": false,
+     "instruction_parts": [
+      {
+       "content": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+       "dynamic": false,
+       "part_kind": "instruction"
+      }
+     ],
+     "thinking": null
+    },
+    "settings": null,
+    "reported_input_tokens": 10593
+   },
+   {
+    "messages": [
+     {
+      "parts": [
+       {
+        "content": "You are a careful operations assistant. Use the tools to answer.",
+        "dynamic_ref": null,
+        "part_kind": "system-prompt"
+       },
+       {
+        "content": "<task>\nRead densely.\n</task>\n\n<working_context>\n{\"id\": \"s1.act\", \"role\": \"assistant\", \"body\": \"logs({\\\"n\\\":1})\"}\n{\"id\": \"s1.obs\", \"role\": \"observation\", \"body\": \"[logs]\\nlog page 1\\n2026-09-02T00:00|node-31|req-0010000|61.51ms|svc-0\\n2026-09-03T07:13|node-32|req-0010001|989.72ms|svc-1\\n2026-09-04T14:26|node-33|req-0010002|917.93ms|svc-2\\n2026-09-05T21:39|node-34|req-0010003|846.14ms|svc-3\\n2026-09-06T04:52|node-35|req-0010004|774.35ms|svc-4\\n2026-09-07T11:05|node-36|req-0010005|702.56ms|svc-5\\n2026-09-08T18:18|node-37|req-0010006|630.77ms|svc-6\\n2026-09-09T01:31|node-38|req-0010007|558.98ms|svc-7\\n2026-09-10T08:44|node-39|req-0010008|487.19ms|svc-8\\n2026-09-11T15:57|node-40|req-0010009|415.40ms|svc-9\\n2026-09-12T22:10|node-41|req-0010010|343.61ms|svc-10\\n2026-09-13T05:23|node-42|req-0010011|271.82ms|svc-11\\n2026-09-14T12:36|node-43|req-0010012|200.03ms|svc-12\\n2026-09-15T19:49|node-44|req-0010013|128.24ms|svc-13\\n2026-09-16T02:02|node-45|req-0010014|56.45ms|svc-14\\n2026-09-17T09:15|node-46|req-0010015|984.66ms|svc-15\\n2026-09-18T16:28|node-47|req-0010016|912.87ms|svc-16\\n2026-09-19T23:41|node-48|req-0010017|841.08ms|svc-17\\n2026-09-20T06:54|node-49|req-0010018|769.29ms|svc-18\\n2026-09-21T13:07|node-50|req-0010019|697.50ms|svc-0\\n2026-09-22T20:20|node-51|req-0010020|625.71ms|svc-1\\n2026-09-23T03:33|node-52|req-0010021|553.92ms|svc-2\\n2026-09-24T10:46|node-53|req-0010022|482.13ms|svc-3\\n2026-09-25T17:59|node-54|req-0010023|410.34ms|svc-4\\n2026-09-26T00:12|node-55|req-0010024|338.55ms|svc-5\\n2026-09-27T07:25|node-56|req-0010025|266.76ms|svc-6\\n2026-09-28T14:38|node-57|req-0010026|194.97ms|svc-7\\n2026-09-01T21:51|node-58|req-0010027|123.18ms|svc-8\\n2026-09-02T04:04|node-59|req-0010028|51.39ms|svc-9\\n2026-09-03T11:17|node-60|req-0010029|979.60ms|svc-10\\n2026-09-04T18:30|node-61|req-0010030|907.81ms|svc-11\\n2026-09-05T01:43|node-62|req-0010031|836.02ms|svc-12\\n2026-09-06T08:56|node-63|req-0010032|764.23ms|svc-13\\n2026-09-07T15:09|node-64|req-0010033|692.44ms|svc-14\\n2026-09-08T22:22|node-65|req-0010034|620.65ms|svc-15\\n2026-09-09T05:35|node-66|req-0010035|548.86ms|svc-16\\n2026-09-10T12:48|node-67|req-0010036|477.07ms|svc-17\\n2026-09-11T19:01|node-68|req-0010037|405.28ms|svc-18\\n2026-09-12T02:14|node-69|req-0010038|333.49ms|svc-0\\n2026-09-13T09:27|node-70|req-0010039|261.70ms|svc-1\\n2026-09-14T16:40|node-71|req-0010040|189.91ms|svc-2\\n2026-09-15T23:53|node-72|req-0010041|118.12ms|svc-3\\n2026-09-16T06:06|node-73|req-0010042|46.33ms|svc-4\\n2026-09-17T13:19|node-74|req-0010043|974.54ms|svc-5\\n2026-09-18T20:32|node-75|req-0010044|902.75ms|svc-6\\n2026-09-19T03:45|node-76|req-0010045|830.96ms|svc-7\\n2026-09-20T10:58|node-77|req-0010046|759.17ms|svc-8\\n2026-09-21T17:11|node-78|req-0010047|687.38ms|svc-9\\n2026-09-22T00:24|node-79|req-0010048|615.59ms|svc-10\\n2026-09-23T07:37|node-80|req-0010049|543.80ms|svc-11\\n2026-09-24T14:50|node-81|req-0010050|472.01ms|svc-12\\n2026-09-25T21:03|node-82|req-0010051|400.22ms|svc-13\\n2026-09-26T04:16|node-83|req-0010052|328.43ms|svc-14\\n2026-09-27T11:29|node-84|req-0010053|256.64ms|svc-15\\n2026-09-28T18:42|node-85|req-0010054|184.85ms|svc-16\\n2026-09-01T01:55|node-86|req-0010055|113.06ms|svc-17\\n2026-09-02T08:08|node-87|req-0010056|41.27ms|svc-18\\n2026-09-03T15:21|node-88|req-0010057|969.48ms|svc-0\\n2026-09-04T22:34|node-89|req-0010058|897.69ms|svc-1\\n2026-09-05T05:47|node-90|req-0010059|825.90ms|svc-2\\n2026-09-06T12:00|node-91|req-0010060|754.11ms|svc-3\\n2026-09-07T19:13|node-92|req-0010061|682.32ms|svc-4\\n2026-09-08T02:26|node-93|req-0010062|610.53ms|svc-5\\n2026-09-09T09:39|node-94|req-0010063|538.74ms|svc-6\\n2026-09-10T16:52|node-95|req-0010064|466.95ms|svc-7\\n2026-09-11T23:05|node-96|req-0010065|395.16ms|svc-8\\n2026-09-12T06:18|node-00|req-0010066|323.37ms|svc-9\\n2026-09-13T13:31|node-01|req-0010067|251.58ms|svc-10\\n2026-09-14T20:44|node-02|req-0010068|179.79ms|svc-11\\n2026-09-15T03:57|node-03|req-0010069|108.00ms|svc-12\\n2026-09-16T10:10|node-04|req-0010070|36.21ms|svc-13\\n2026-09-17T17:23|node-05|req-0010071|964.42ms|svc-14\\n2026-09-18T00:36|node-06|req-0010072|892.63ms|svc-15\\n2026-09-19T07:49|node-07|req-0010073|820.84ms|svc-16\\n2026-09-20T14:02|node-08|req-0010074|749.05ms|svc-17\\n2026-09-21T21:15|node-09|req-0010075|677.26ms|svc-18\\n2026-09-22T04:28|node-10|req-0010076|605.47ms|svc-0\\n2026-09-23T11:41|node-11|req-0010077|533.68ms|svc-1\\n2026-09-24T18:54|node-12|req-0010078|461.89ms|svc-2\\n2026-09-25T01:07|node-13|req-0010079|390.10ms|svc-3\"}\n{\"id\": \"s2.act\", \"role\": \"assistant\", \"body\": \"logs({\\\"n\\\":2})\"}\n{\"id\": \"s2.obs\", \"role\": \"observation\", \"body\": \"[logs]\\nlog page 2\\n2026-09-03T00:00|node-62|req-0020000|123.02ms|svc-0\\n2026-09-04T07:13|node-63|req-0020001|51.23ms|svc-1\\n2026-09-05T14:26|node-64|req-0020002|979.44ms|svc-2\\n2026-09-06T21:39|node-65|req-0020003|907.65ms|svc-3\\n2026-09-07T04:52|node-66|req-0020004|835.86ms|svc-4\\n2026-09-08T11:05|node-67|req-0020005|764.07ms|svc-5\\n2026-09-09T18:18|node-68|req-0020006|692.28ms|svc-6\\n2026-09-10T01:31|node-69|req-0020007|620.49ms|svc-7\\n2026-09-11T08:44|node-70|req-0020008|548.70ms|svc-8\\n2026-09-12T15:57|node-71|req-0020009|476.91ms|svc-9\\n2026-09-13T22:10|node-72|req-0020010|405.12ms|svc-10\\n2026-09-14T05:23|node-73|req-0020011|333.33ms|svc-11\\n2026-09-15T12:36|node-74|req-0020012|261.54ms|svc-12\\n2026-09-16T19:49|node-75|req-0020013|189.75ms|svc-13\\n2026-09-17T02:02|node-76|req-0020014|117.96ms|svc-14\\n2026-09-18T09:15|node-77|req-0020015|46.17ms|svc-15\\n2026-09-19T16:28|node-78|req-0020016|974.38ms|svc-16\\n2026-09-20T23:41|node-79|req-0020017|902.59ms|svc-17\\n2026-09-21T06:54|node-80|req-0020018|830.80ms|svc-18\\n2026-09-22T13:07|node-81|req-0020019|759.01ms|svc-0\\n2026-09-23T20:20|node-82|req-0020020|687.22ms|svc-1\\n2026-09-24T03:33|node-83|req-0020021|615.43ms|svc-2\\n2026-09-25T10:46|node-84|req-0020022|543.64ms|svc-3\\n2026-09-26T17:59|node-85|req-0020023|471.85ms|svc-4\\n2026-09-27T00:12|node-86|req-0020024|400.06ms|svc-5\\n2026-09-28T07:25|node-87|req-0020025|328.27ms|svc-6\\n2026-09-01T14:38|node-88|req-0020026|256.48ms|svc-7\\n2026-09-02T21:51|node-89|req-0020027|184.69ms|svc-8\\n2026-09-03T04:04|node-90|req-0020028|112.90ms|svc-9\\n2026-09-04T11:17|node-91|req-0020029|41.11ms|svc-10\\n2026-09-05T18:30|node-92|req-0020030|969.32ms|svc-11\\n2026-09-06T01:43|node-93|req-0020031|897.53ms|svc-12\\n2026-09-07T08:56|node-94|req-0020032|825.74ms|svc-13\\n2026-09-08T15:09|node-95|req-0020033|753.95ms|svc-14\\n2026-09-09T22:22|node-96|req-0020034|682.16ms|svc-15\\n2026-09-10T05:35|node-00|req-0020035|610.37ms|svc-16\\n2026-09-11T12:48|node-01|req-0020036|538.58ms|svc-17\\n2026-09-12T19:01|node-02|req-0020037|466.79ms|svc-18\\n2026-09-13T02:14|node-03|req-0020038|395.00ms|svc-0\\n2026-09-14T09:27|node-04|req-0020039|323.21ms|svc-1\\n2026-09-15T16:40|node-05|req-0020040|251.42ms|svc-2\\n2026-09-16T23:53|node-06|req-0020041|179.63ms|svc-3\\n2026-09-17T06:06|node-07|req-0020042|107.84ms|svc-4\\n2026-09-18T13:19|node-08|req-0020043|36.05ms|svc-5\\n2026-09-19T20:32|node-09|req-0020044|964.26ms|svc-6\\n2026-09-20T03:45|node-10|req-0020045|892.47ms|svc-7\\n2026-09-21T10:58|node-11|req-0020046|820.68ms|svc-8\\n2026-09-22T17:11|node-12|req-0020047|748.89ms|svc-9\\n2026-09-23T00:24|node-13|req-0020048|677.10ms|svc-10\\n2026-09-24T07:37|node-14|req-0020049|605.31ms|svc-11\\n2026-09-25T14:50|node-15|req-0020050|533.52ms|svc-12\\n2026-09-26T21:03|node-16|req-0020051|461.73ms|svc-13\\n2026-09-27T04:16|node-17|req-0020052|389.94ms|svc-14\\n2026-09-28T11:29|node-18|req-0020053|318.15ms|svc-15\\n2026-09-01T18:42|node-19|req-0020054|246.36ms|svc-16\\n2026-09-02T01:55|node-20|req-0020055|174.57ms|svc-17\\n2026-09-03T08:08|node-21|req-0020056|102.78ms|svc-18\\n2026-09-04T15:21|node-22|req-0020057|30.99ms|svc-0\\n2026-09-05T22:34|node-23|req-0020058|959.20ms|svc-1\\n2026-09-06T05:47|node-24|req-0020059|887.41ms|svc-2\\n2026-09-07T12:00|node-25|req-0020060|815.62ms|svc-3\\n2026-09-08T19:13|node-26|req-0020061|743.83ms|svc-4\\n2026-09-09T02:26|node-27|req-0020062|672.04ms|svc-5\\n2026-09-10T09:39|node-28|req-0020063|600.25ms|svc-6\\n2026-09-11T16:52|node-29|req-0020064|528.46ms|svc-7\\n2026-09-12T23:05|node-30|req-0020065|456.67ms|svc-8\\n2026-09-13T06:18|node-31|req-0020066|384.88ms|svc-9\\n2026-09-14T13:31|node-32|req-0020067|313.09ms|svc-10\\n2026-09-15T20:44|node-33|req-0020068|241.30ms|svc-11\\n2026-09-16T03:57|node-34|req-0020069|169.51ms|svc-12\\n2026-09-17T10:10|node-35|req-0020070|97.72ms|svc-13\\n2026-09-18T17:23|node-36|req-0020071|25.93ms|svc-14\\n2026-09-19T00:36|node-37|req-0020072|954.14ms|svc-15\\n2026-09-20T07:49|node-38|req-0020073|882.35ms|svc-16\\n2026-09-21T14:02|node-39|req-0020074|810.56ms|svc-17\\n2026-09-22T21:15|node-40|req-0020075|738.77ms|svc-18\\n2026-09-23T04:28|node-41|req-0020076|666.98ms|svc-0\\n2026-09-24T11:41|node-42|req-0020077|595.19ms|svc-1\\n2026-09-25T18:54|node-43|req-0020078|523.40ms|svc-2\\n2026-09-26T01:07|node-44|req-0020079|451.61ms|svc-3\"}\n{\"id\": \"s3.act\", \"role\": \"assistant\", \"body\": \"huge({})\\nsearch({\\\"query\\\":\\\"latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression \\\"})\"}\n{\"id\": \"s3.obs\", \"role\": \"observation\", \"body\": \"[huge]\\nHeld back: huge({}), about 17,965 tokens; only 3,869 tokens free under the limit. Tidy your context, then call it again.\\n\\n[search]\\nHeld back: search({\\\"query\\\":\\\"latency regression latency regression latency regression latency regr…), about 260 tokens; only 3,763 tokens free under the limit. Tidy your context, then call it again.\"}\n{\"id\": \"s4.act\", \"role\": \"assistant\", \"body\": \"search({\\\"query\\\":\\\"latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression \\\"})\"}\n{\"id\": \"s4.obs\", \"role\": \"observation\", \"body\": \"[search]\\n3 runbook hits for 'latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression ': restart, drain, rollback\"}\n{\"id\": \"s5.act\", \"role\": \"assistant\", \"body\": \"search({\\\"query\\\":\\\"latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression \\\"})\"}\n{\"id\": \"s5.obs\", \"role\": \"observation\", \"body\": \"[search]\\n3 runbook hits for 'latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression ': restart, drain, rollback\"}\n{\"id\": \"s6.act\", \"role\": \"assistant\", \"body\": \"logs({\\\"n\\\":3})\\nlogs({\\\"n\\\":4})\"}\n{\"id\": \"s6.obs\", \"role\": \"observation\", \"body\": \"[logs]\\nHeld back: logs({\\\"n\\\":3}), about 4,000 tokens; only 3,198 tokens free under the limit. Tidy your context, then call it again.\\n\\n[logs]\\nHeld back: logs({\\\"n\\\":4}), about 4,013 tokens; only 3,084 tokens free under the limit. Tidy your context, then call it again.\"}\n</working_context>\n\n<runtime_status>\nstep 7; task steps used this turn 6 of 60 (edit_context steps are free); model calls this turn 6 of 144\nrequest size: about 10,956 of 13,952 tokens (79% of the limit); budget 16,000\ncontext revision 6, 12 entries\n</runtime_status>\n",
+        "part_kind": "user-prompt"
+       }
+      ],
+      "instructions": null,
+      "kind": "request",
+      "metadata": null,
+      "state": "complete"
+     }
+    ],
+    "instructions": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+    "parameters": {
+     "function_tools": [
+      {
+       "name": "status",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the service status.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "greet",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "name": {
+          "description": "Who to greet.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "name"
+        ],
+        "type": "object"
+       },
+       "description": "Send a greeting to an on-call engineer.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "big",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the long build log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "huge",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the full crash dump.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "wide",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Read the raw trace file.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "logs",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "n": {
+          "description": "The page number, from 1.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "n"
+        ],
+        "type": "object"
+       },
+       "description": "Read one page of the request log.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "search",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "query": {
+          "description": "What to look for.",
+          "type": "string"
+         },
+         "limit": {
+          "default": 5,
+          "description": "The most results to return.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "query"
+        ],
+        "type": "object"
+       },
+       "description": "Search the runbook.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "ticket",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "key": {
+          "description": "The ticket key.",
+          "type": "string"
+         }
+        },
+        "required": [
+         "key"
+        ],
+        "type": "object"
+       },
+       "description": "Look up a ticket by key.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "tally",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "items": {
+          "description": "The items.",
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "items"
+        ],
+        "type": "object"
+       },
+       "description": "Count items.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "flaky",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "attempt": {
+          "description": "The attempt number, from 0.",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "attempt"
+        ],
+        "type": "object"
+       },
+       "description": "A probe that fails on its first attempt.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "broken",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "A tool whose backend is down.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "snapshot",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Take a dashboard snapshot (an image plus a caption).",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "diagram",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+       },
+       "description": "Fetch the topology diagram.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      },
+      {
+       "name": "edit_context",
+       "parameters_json_schema": {
+        "additionalProperties": false,
+        "properties": {
+         "ops": {
+          "description": "A list of {\"op\": \"delete\", \"ids\": [...]}, {\"op\": \"replace\", \"id\": ..., \"body\": ...} or\n{\"op\": \"add_note\", \"id\": ..., \"body\": ...}.",
+          "items": {
+           "additionalProperties": true,
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "ops"
+        ],
+        "type": "object"
+       },
+       "description": "Apply operations to your working context, in order.",
+       "outer_typed_dict_key": null,
+       "strict": null,
+       "sequential": false,
+       "kind": "function",
+       "metadata": null,
+       "timeout": null,
+       "defer_loading": false,
+       "unless_native": null,
+       "with_native": null,
+       "tool_kind": null,
+       "return_schema": null,
+       "include_return_schema": null
+      }
+     ],
+     "native_tools": [],
+     "tool_visibility": {
+      "status": "visible",
+      "greet": "visible",
+      "big": "visible",
+      "huge": "visible",
+      "wide": "visible",
+      "logs": "visible",
+      "search": "visible",
+      "ticket": "visible",
+      "tally": "visible",
+      "flaky": "visible",
+      "broken": "visible",
+      "snapshot": "visible",
+      "diagram": "visible",
+      "edit_context": "visible"
+     },
+     "revealed_tool_names": [],
+     "output_mode": "text",
+     "output_object": null,
+     "output_tools": [],
+     "prompted_output_template": null,
+     "allow_text_output": true,
+     "allow_image_output": false,
+     "instruction_parts": [
+      {
+       "content": "Each request contains three sections:\n- <task>: the fixed task. It is never edited and always present.\n- <runtime_status>: limits and budget occupancy computed by the runtime.\n- <working_context>: your transcript so far, one JSON object per line with id, role, body.\n  This is the only memory you have between steps (apart from files you write).\n\nYou may call several tools in one step; they all run.\n\"edit_context\" applies a list of operations to your working context, in order:\n{\"op\": \"delete\", \"ids\": [\"...\"]}, {\"op\": \"replace\", \"id\": \"...\", \"body\": \"...\"} and\n{\"op\": \"add_note\", \"id\": \"...\", \"body\": \"...\"}. A short result comes back as an observation entry.\n\nCONTEXT EDITING (you control your working context):\n- The entries in <working_context> are your working context. Whatever it contains after your\n  step becomes <working_context> in the next request.\n  ids: unique, 1-64 chars of [A-Za-z0-9_.:~-]; roles: assistant, observation, note, summary, receipt.\n  Limits: 200 entries, 24000 chars per body.\n- With the operations you may delete entries, rewrite or shorten bodies, and add notes.\n- Entries marked protected (earlier requests and your earlier answers) can't be edited or deleted; tidy everything else as needed.\n- Ordering rule: the context you see at the start of a step holds the context up to the previous\n  step. After your step, the runtime validates the edit, then appends this step's action and\n  observation (and a short receipt if you edited). Edits therefore cannot remove the current\n  step's output; you can remove it in a later step.\n- Invalid edits (unknown ids, duplicate ids, other roles, too large) are rejected and the previous\n  context is kept. The task and these instructions are outside the context.\n- Editing is optional. When <runtime_status> reports pressure, manage the context before it runs\n  out. Keep exact values, file:line references and open questions you still need.",
+       "dynamic": false,
+       "part_kind": "instruction"
+      }
+     ],
+     "thinking": null
+    },
+    "settings": null,
+    "reported_input_tokens": 10782
+   }
+  ],
+  "records": [
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_guard_check",
+    "step": 1,
+    "r": 1.5,
+    "shared_base": 2389,
+    "added_chars": 4514,
+    "conservative_added": 3311,
+    "projected": 5700
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_guard_check",
+    "step": 2,
+    "r": 1.5,
+    "shared_base": 6053,
+    "added_chars": 4515,
+    "conservative_added": 3312,
+    "projected": 9365
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_parallel_calls",
+    "calls": [
+     "search"
+    ]
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_guard_check",
+    "step": 3,
+    "r": 1.2323,
+    "shared_base": 9717,
+    "added_chars": 20535,
+    "conservative_added": 18331,
+    "projected": 28048
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_guard_check",
+    "step": 3,
+    "r": 1.2323,
+    "shared_base": 9717,
+    "added_chars": 410,
+    "conservative_added": 366,
+    "projected": 10083
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_guard_check",
+    "step": 3,
+    "r": 1.2323,
+    "shared_base": 9717,
+    "added_chars": 20535,
+    "conservative_added": 18331,
+    "projected": 28048
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_held_back",
+    "step": 3,
+    "tool": "huge",
+    "args": "{}",
+    "estimated_tokens": 17965,
+    "free_tokens": 3869,
+    "r": 1.2323,
+    "shared_estimate": 26387,
+    "conservative_estimate": 28048
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_guard_check",
+    "step": 3,
+    "r": 1.2323,
+    "shared_base": 9717,
+    "added_chars": 528,
+    "conservative_added": 472,
+    "projected": 10189
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_guard_check",
+    "step": 3,
+    "r": 1.2323,
+    "shared_base": 9717,
+    "added_chars": 820,
+    "conservative_added": 732,
+    "projected": 10449
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_held_back",
+    "step": 3,
+    "tool": "search",
+    "args": "{\"query\":\"latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression \"}",
+    "estimated_tokens": 260,
+    "free_tokens": 3763,
+    "r": 1.2323,
+    "shared_estimate": 10383,
+    "conservative_estimate": 10449
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_refetch",
+    "step": 4,
+    "tool": "search",
+    "args": "{\"query\":\"latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression \"}"
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_guard_check",
+    "step": 4,
+    "r": 1.2323,
+    "shared_base": 8794,
+    "added_chars": 674,
+    "conservative_added": 602,
+    "projected": 9396
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_guard_check",
+    "step": 5,
+    "r": 1.2323,
+    "shared_base": 9712,
+    "added_chars": 674,
+    "conservative_added": 602,
+    "projected": 10314
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_parallel_calls",
+    "calls": [
+     "logs"
+    ]
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_guard_check",
+    "step": 6,
+    "r": 1.2323,
+    "shared_base": 10593,
+    "added_chars": 4661,
+    "conservative_added": 4161,
+    "projected": 14754
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_guard_check",
+    "step": 6,
+    "r": 1.2323,
+    "shared_base": 10593,
+    "added_chars": 180,
+    "conservative_added": 161,
+    "projected": 10754
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_guard_check",
+    "step": 6,
+    "r": 1.2323,
+    "shared_base": 10593,
+    "added_chars": 4661,
+    "conservative_added": 4161,
+    "projected": 14754
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_held_back",
+    "step": 6,
+    "tool": "logs",
+    "args": "{\"n\":3}",
+    "estimated_tokens": 4000,
+    "free_tokens": 3198,
+    "r": 1.2323,
+    "shared_estimate": 14377,
+    "conservative_estimate": 14754
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_guard_check",
+    "step": 6,
+    "r": 1.2323,
+    "shared_base": 10593,
+    "added_chars": 308,
+    "conservative_added": 275,
+    "projected": 10868
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_guard_check",
+    "step": 6,
+    "r": 1.2323,
+    "shared_base": 10593,
+    "added_chars": 4803,
+    "conservative_added": 4288,
+    "projected": 14881
+   },
+   {
+    "variant": "clm_lite_v3_3",
+    "type": "lite_held_back",
+    "step": 6,
+    "tool": "logs",
+    "args": "{\"n\":4}",
+    "estimated_tokens": 4013,
+    "free_tokens": 3084,
+    "r": 1.2323,
+    "shared_estimate": 14492,
+    "conservative_estimate": 14881
+   }
+  ],
+  "runs": [
+   {
+    "prompt": "Read densely.",
+    "calls": 7,
+    "output": "done",
+    "all_messages": [
+     {
+      "parts": [
+       {
+        "content": "You are a careful operations assistant. Use the tools to answer.",
+        "dynamic_ref": null,
+        "part_kind": "system-prompt"
+       },
+       {
+        "content": "<task>\nRead densely.\n</task>\n\n<working_context>\n{\"id\": \"s1.act\", \"role\": \"assistant\", \"body\": \"logs({\\\"n\\\":1})\"}\n{\"id\": \"s1.obs\", \"role\": \"observation\", \"body\": \"[logs]\\nlog page 1\\n2026-09-02T00:00|node-31|req-0010000|61.51ms|svc-0\\n2026-09-03T07:13|node-32|req-0010001|989.72ms|svc-1\\n2026-09-04T14:26|node-33|req-0010002|917.93ms|svc-2\\n2026-09-05T21:39|node-34|req-0010003|846.14ms|svc-3\\n2026-09-06T04:52|node-35|req-0010004|774.35ms|svc-4\\n2026-09-07T11:05|node-36|req-0010005|702.56ms|svc-5\\n2026-09-08T18:18|node-37|req-0010006|630.77ms|svc-6\\n2026-09-09T01:31|node-38|req-0010007|558.98ms|svc-7\\n2026-09-10T08:44|node-39|req-0010008|487.19ms|svc-8\\n2026-09-11T15:57|node-40|req-0010009|415.40ms|svc-9\\n2026-09-12T22:10|node-41|req-0010010|343.61ms|svc-10\\n2026-09-13T05:23|node-42|req-0010011|271.82ms|svc-11\\n2026-09-14T12:36|node-43|req-0010012|200.03ms|svc-12\\n2026-09-15T19:49|node-44|req-0010013|128.24ms|svc-13\\n2026-09-16T02:02|node-45|req-0010014|56.45ms|svc-14\\n2026-09-17T09:15|node-46|req-0010015|984.66ms|svc-15\\n2026-09-18T16:28|node-47|req-0010016|912.87ms|svc-16\\n2026-09-19T23:41|node-48|req-0010017|841.08ms|svc-17\\n2026-09-20T06:54|node-49|req-0010018|769.29ms|svc-18\\n2026-09-21T13:07|node-50|req-0010019|697.50ms|svc-0\\n2026-09-22T20:20|node-51|req-0010020|625.71ms|svc-1\\n2026-09-23T03:33|node-52|req-0010021|553.92ms|svc-2\\n2026-09-24T10:46|node-53|req-0010022|482.13ms|svc-3\\n2026-09-25T17:59|node-54|req-0010023|410.34ms|svc-4\\n2026-09-26T00:12|node-55|req-0010024|338.55ms|svc-5\\n2026-09-27T07:25|node-56|req-0010025|266.76ms|svc-6\\n2026-09-28T14:38|node-57|req-0010026|194.97ms|svc-7\\n2026-09-01T21:51|node-58|req-0010027|123.18ms|svc-8\\n2026-09-02T04:04|node-59|req-0010028|51.39ms|svc-9\\n2026-09-03T11:17|node-60|req-0010029|979.60ms|svc-10\\n2026-09-04T18:30|node-61|req-0010030|907.81ms|svc-11\\n2026-09-05T01:43|node-62|req-0010031|836.02ms|svc-12\\n2026-09-06T08:56|node-63|req-0010032|764.23ms|svc-13\\n2026-09-07T15:09|node-64|req-0010033|692.44ms|svc-14\\n2026-09-08T22:22|node-65|req-0010034|620.65ms|svc-15\\n2026-09-09T05:35|node-66|req-0010035|548.86ms|svc-16\\n2026-09-10T12:48|node-67|req-0010036|477.07ms|svc-17\\n2026-09-11T19:01|node-68|req-0010037|405.28ms|svc-18\\n2026-09-12T02:14|node-69|req-0010038|333.49ms|svc-0\\n2026-09-13T09:27|node-70|req-0010039|261.70ms|svc-1\\n2026-09-14T16:40|node-71|req-0010040|189.91ms|svc-2\\n2026-09-15T23:53|node-72|req-0010041|118.12ms|svc-3\\n2026-09-16T06:06|node-73|req-0010042|46.33ms|svc-4\\n2026-09-17T13:19|node-74|req-0010043|974.54ms|svc-5\\n2026-09-18T20:32|node-75|req-0010044|902.75ms|svc-6\\n2026-09-19T03:45|node-76|req-0010045|830.96ms|svc-7\\n2026-09-20T10:58|node-77|req-0010046|759.17ms|svc-8\\n2026-09-21T17:11|node-78|req-0010047|687.38ms|svc-9\\n2026-09-22T00:24|node-79|req-0010048|615.59ms|svc-10\\n2026-09-23T07:37|node-80|req-0010049|543.80ms|svc-11\\n2026-09-24T14:50|node-81|req-0010050|472.01ms|svc-12\\n2026-09-25T21:03|node-82|req-0010051|400.22ms|svc-13\\n2026-09-26T04:16|node-83|req-0010052|328.43ms|svc-14\\n2026-09-27T11:29|node-84|req-0010053|256.64ms|svc-15\\n2026-09-28T18:42|node-85|req-0010054|184.85ms|svc-16\\n2026-09-01T01:55|node-86|req-0010055|113.06ms|svc-17\\n2026-09-02T08:08|node-87|req-0010056|41.27ms|svc-18\\n2026-09-03T15:21|node-88|req-0010057|969.48ms|svc-0\\n2026-09-04T22:34|node-89|req-0010058|897.69ms|svc-1\\n2026-09-05T05:47|node-90|req-0010059|825.90ms|svc-2\\n2026-09-06T12:00|node-91|req-0010060|754.11ms|svc-3\\n2026-09-07T19:13|node-92|req-0010061|682.32ms|svc-4\\n2026-09-08T02:26|node-93|req-0010062|610.53ms|svc-5\\n2026-09-09T09:39|node-94|req-0010063|538.74ms|svc-6\\n2026-09-10T16:52|node-95|req-0010064|466.95ms|svc-7\\n2026-09-11T23:05|node-96|req-0010065|395.16ms|svc-8\\n2026-09-12T06:18|node-00|req-0010066|323.37ms|svc-9\\n2026-09-13T13:31|node-01|req-0010067|251.58ms|svc-10\\n2026-09-14T20:44|node-02|req-0010068|179.79ms|svc-11\\n2026-09-15T03:57|node-03|req-0010069|108.00ms|svc-12\\n2026-09-16T10:10|node-04|req-0010070|36.21ms|svc-13\\n2026-09-17T17:23|node-05|req-0010071|964.42ms|svc-14\\n2026-09-18T00:36|node-06|req-0010072|892.63ms|svc-15\\n2026-09-19T07:49|node-07|req-0010073|820.84ms|svc-16\\n2026-09-20T14:02|node-08|req-0010074|749.05ms|svc-17\\n2026-09-21T21:15|node-09|req-0010075|677.26ms|svc-18\\n2026-09-22T04:28|node-10|req-0010076|605.47ms|svc-0\\n2026-09-23T11:41|node-11|req-0010077|533.68ms|svc-1\\n2026-09-24T18:54|node-12|req-0010078|461.89ms|svc-2\\n2026-09-25T01:07|node-13|req-0010079|390.10ms|svc-3\"}\n{\"id\": \"s2.act\", \"role\": \"assistant\", \"body\": \"logs({\\\"n\\\":2})\"}\n{\"id\": \"s2.obs\", \"role\": \"observation\", \"body\": \"[logs]\\nlog page 2\\n2026-09-03T00:00|node-62|req-0020000|123.02ms|svc-0\\n2026-09-04T07:13|node-63|req-0020001|51.23ms|svc-1\\n2026-09-05T14:26|node-64|req-0020002|979.44ms|svc-2\\n2026-09-06T21:39|node-65|req-0020003|907.65ms|svc-3\\n2026-09-07T04:52|node-66|req-0020004|835.86ms|svc-4\\n2026-09-08T11:05|node-67|req-0020005|764.07ms|svc-5\\n2026-09-09T18:18|node-68|req-0020006|692.28ms|svc-6\\n2026-09-10T01:31|node-69|req-0020007|620.49ms|svc-7\\n2026-09-11T08:44|node-70|req-0020008|548.70ms|svc-8\\n2026-09-12T15:57|node-71|req-0020009|476.91ms|svc-9\\n2026-09-13T22:10|node-72|req-0020010|405.12ms|svc-10\\n2026-09-14T05:23|node-73|req-0020011|333.33ms|svc-11\\n2026-09-15T12:36|node-74|req-0020012|261.54ms|svc-12\\n2026-09-16T19:49|node-75|req-0020013|189.75ms|svc-13\\n2026-09-17T02:02|node-76|req-0020014|117.96ms|svc-14\\n2026-09-18T09:15|node-77|req-0020015|46.17ms|svc-15\\n2026-09-19T16:28|node-78|req-0020016|974.38ms|svc-16\\n2026-09-20T23:41|node-79|req-0020017|902.59ms|svc-17\\n2026-09-21T06:54|node-80|req-0020018|830.80ms|svc-18\\n2026-09-22T13:07|node-81|req-0020019|759.01ms|svc-0\\n2026-09-23T20:20|node-82|req-0020020|687.22ms|svc-1\\n2026-09-24T03:33|node-83|req-0020021|615.43ms|svc-2\\n2026-09-25T10:46|node-84|req-0020022|543.64ms|svc-3\\n2026-09-26T17:59|node-85|req-0020023|471.85ms|svc-4\\n2026-09-27T00:12|node-86|req-0020024|400.06ms|svc-5\\n2026-09-28T07:25|node-87|req-0020025|328.27ms|svc-6\\n2026-09-01T14:38|node-88|req-0020026|256.48ms|svc-7\\n2026-09-02T21:51|node-89|req-0020027|184.69ms|svc-8\\n2026-09-03T04:04|node-90|req-0020028|112.90ms|svc-9\\n2026-09-04T11:17|node-91|req-0020029|41.11ms|svc-10\\n2026-09-05T18:30|node-92|req-0020030|969.32ms|svc-11\\n2026-09-06T01:43|node-93|req-0020031|897.53ms|svc-12\\n2026-09-07T08:56|node-94|req-0020032|825.74ms|svc-13\\n2026-09-08T15:09|node-95|req-0020033|753.95ms|svc-14\\n2026-09-09T22:22|node-96|req-0020034|682.16ms|svc-15\\n2026-09-10T05:35|node-00|req-0020035|610.37ms|svc-16\\n2026-09-11T12:48|node-01|req-0020036|538.58ms|svc-17\\n2026-09-12T19:01|node-02|req-0020037|466.79ms|svc-18\\n2026-09-13T02:14|node-03|req-0020038|395.00ms|svc-0\\n2026-09-14T09:27|node-04|req-0020039|323.21ms|svc-1\\n2026-09-15T16:40|node-05|req-0020040|251.42ms|svc-2\\n2026-09-16T23:53|node-06|req-0020041|179.63ms|svc-3\\n2026-09-17T06:06|node-07|req-0020042|107.84ms|svc-4\\n2026-09-18T13:19|node-08|req-0020043|36.05ms|svc-5\\n2026-09-19T20:32|node-09|req-0020044|964.26ms|svc-6\\n2026-09-20T03:45|node-10|req-0020045|892.47ms|svc-7\\n2026-09-21T10:58|node-11|req-0020046|820.68ms|svc-8\\n2026-09-22T17:11|node-12|req-0020047|748.89ms|svc-9\\n2026-09-23T00:24|node-13|req-0020048|677.10ms|svc-10\\n2026-09-24T07:37|node-14|req-0020049|605.31ms|svc-11\\n2026-09-25T14:50|node-15|req-0020050|533.52ms|svc-12\\n2026-09-26T21:03|node-16|req-0020051|461.73ms|svc-13\\n2026-09-27T04:16|node-17|req-0020052|389.94ms|svc-14\\n2026-09-28T11:29|node-18|req-0020053|318.15ms|svc-15\\n2026-09-01T18:42|node-19|req-0020054|246.36ms|svc-16\\n2026-09-02T01:55|node-20|req-0020055|174.57ms|svc-17\\n2026-09-03T08:08|node-21|req-0020056|102.78ms|svc-18\\n2026-09-04T15:21|node-22|req-0020057|30.99ms|svc-0\\n2026-09-05T22:34|node-23|req-0020058|959.20ms|svc-1\\n2026-09-06T05:47|node-24|req-0020059|887.41ms|svc-2\\n2026-09-07T12:00|node-25|req-0020060|815.62ms|svc-3\\n2026-09-08T19:13|node-26|req-0020061|743.83ms|svc-4\\n2026-09-09T02:26|node-27|req-0020062|672.04ms|svc-5\\n2026-09-10T09:39|node-28|req-0020063|600.25ms|svc-6\\n2026-09-11T16:52|node-29|req-0020064|528.46ms|svc-7\\n2026-09-12T23:05|node-30|req-0020065|456.67ms|svc-8\\n2026-09-13T06:18|node-31|req-0020066|384.88ms|svc-9\\n2026-09-14T13:31|node-32|req-0020067|313.09ms|svc-10\\n2026-09-15T20:44|node-33|req-0020068|241.30ms|svc-11\\n2026-09-16T03:57|node-34|req-0020069|169.51ms|svc-12\\n2026-09-17T10:10|node-35|req-0020070|97.72ms|svc-13\\n2026-09-18T17:23|node-36|req-0020071|25.93ms|svc-14\\n2026-09-19T00:36|node-37|req-0020072|954.14ms|svc-15\\n2026-09-20T07:49|node-38|req-0020073|882.35ms|svc-16\\n2026-09-21T14:02|node-39|req-0020074|810.56ms|svc-17\\n2026-09-22T21:15|node-40|req-0020075|738.77ms|svc-18\\n2026-09-23T04:28|node-41|req-0020076|666.98ms|svc-0\\n2026-09-24T11:41|node-42|req-0020077|595.19ms|svc-1\\n2026-09-25T18:54|node-43|req-0020078|523.40ms|svc-2\\n2026-09-26T01:07|node-44|req-0020079|451.61ms|svc-3\"}\n{\"id\": \"s3.act\", \"role\": \"assistant\", \"body\": \"huge({})\\nsearch({\\\"query\\\":\\\"latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression \\\"})\"}\n{\"id\": \"s3.obs\", \"role\": \"observation\", \"body\": \"[huge]\\nHeld back: huge({}), about 17,965 tokens; only 3,869 tokens free under the limit. Tidy your context, then call it again.\\n\\n[search]\\nHeld back: search({\\\"query\\\":\\\"latency regression latency regression latency regression latency regr…), about 260 tokens; only 3,763 tokens free under the limit. Tidy your context, then call it again.\"}\n{\"id\": \"s4.act\", \"role\": \"assistant\", \"body\": \"search({\\\"query\\\":\\\"latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression \\\"})\"}\n{\"id\": \"s4.obs\", \"role\": \"observation\", \"body\": \"[search]\\n3 runbook hits for 'latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression ': restart, drain, rollback\"}\n{\"id\": \"s5.act\", \"role\": \"assistant\", \"body\": \"search({\\\"query\\\":\\\"latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression \\\"})\"}\n{\"id\": \"s5.obs\", \"role\": \"observation\", \"body\": \"[search]\\n3 runbook hits for 'latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression latency regression ': restart, drain, rollback\"}\n{\"id\": \"s6.act\", \"role\": \"assistant\", \"body\": \"logs({\\\"n\\\":3})\\nlogs({\\\"n\\\":4})\"}\n{\"id\": \"s6.obs\", \"role\": \"observation\", \"body\": \"[logs]\\nHeld back: logs({\\\"n\\\":3}), about 4,000 tokens; only 3,198 tokens free under the limit. Tidy your context, then call it again.\\n\\n[logs]\\nHeld back: logs({\\\"n\\\":4}), about 4,013 tokens; only 3,084 tokens free under the limit. Tidy your context, then call it again.\"}\n</working_context>\n\n<runtime_status>\nstep 7; task steps used this turn 6 of 60 (edit_context steps are free); model calls this turn 6 of 144\nrequest size: about 10,956 of 13,952 tokens (79% of the limit); budget 16,000\ncontext revision 6, 12 entries\n</runtime_status>\n",
+        "part_kind": "user-prompt"
+       }
+      ],
+      "instructions": null,
+      "kind": "request",
+      "metadata": null,
+      "state": "complete"
+     },
+     {
+      "parts": [
+       {
+        "content": "done",
+        "id": null,
+        "provider_name": null,
+        "provider_details": null,
+        "part_kind": "text"
+       }
+      ],
+      "usage": {
+       "input_tokens": 10782,
+       "cache_write_tokens": 0,
+       "cache_read_tokens": 0,
+       "output_tokens": 10,
+       "input_audio_tokens": 0,
+       "cache_audio_read_tokens": 0,
+       "output_audio_tokens": 0,
+       "details": {},
+       "cost": null
+      },
+      "model_name": "scripted",
+      "kind": "response",
+      "provider_name": null,
+      "provider_url": null,
+      "provider_details": null,
+      "provider_response_id": null,
+      "finish_reason": null,
+      "metadata": null,
+      "state": "complete"
+     }
+    ]
+   }
+  ]
+ }
+}

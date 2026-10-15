@@ -1,0 +1,12 @@
+guarded-clm
+Copyright 2026 Adeeb Rahman
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes software and text derived from clm-lib (https://github.com/armalite/clm-lib, commit
+024fc76a8e79468e3d160112844c7aa9bd2e94ac), licensed under the Apache License, Version 2.0:
+- src/guarded_clm/context.py: the working-context schema, limits, validation and revision store;
+- src/guarded_clm/instructions.py: the instruction text, as adapted.
+
+The design follows the Context Language Models paper (arXiv 2609.37725). No code, prompt or notice text is taken
+from the paper's CC BY-NC reference repository.

@@ -1,215 +1,180 @@
-"""``GuardedContext``: the turn lifecycle around the authoritative store (SPEC §6).
+"""The working context: entries, their limits and validation, and the host-side revision store.
 
-Turn records:
+Derived from clm-lib (`src/clm_lib/context.py`, github.com/armalite/clm-lib, commit
+024fc76a8e79468e3d160112844c7aa9bd2e94ac). Only the parts this design uses are kept: the schema, the limits,
+validation and the revision store. The file mirror and read-back (for code edits in a sandbox) are left out, because
+edits here are structured operations.
 
-- the first user request is the **task anchor**. It is kept outside the working context, is
-  immutable, and is never duplicated as ``t1.request``;
-- the **current request** of a later turn is host-owned and also kept outside the working
-  context while its turn is active, so no edit can reach it;
-- at the first request preparation of turn N+1, the runtime **materialises** the records of
-  turn N into the working context, in one revision: ``tN.request`` (for N >= 2, role
-  ``observation``) and then ``tN.answer`` (role ``assistant``). They are protected when
-  ``protect_turns`` is on.
+    clm-lib is licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in
+    compliance with the License. You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0. Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+    either express or implied. See the License for the specific language governing permissions and limitations.
 
-``prepare_request()`` is the hook the request builder (planned, SPEC §9.1) will call before
-building every request. It is idempotent: the materialisation happens once, and preparing again
-returns the same state without a new revision.
+An edit is validated by serializing the edited entries as the clm-lib file format,
+`{"format": "clm-context/v1", "entries": [{"id", "role", "body"}, ...]}`, and parsing that back with the file
+format's checks, exactly as the tested design does. Revision numbers and hashes live in `ContextStore`.
 """
 
-from __future__ import annotations
+import dataclasses
+import hashlib
+import json
+import re
 
-from collections.abc import Sequence
-from dataclasses import dataclass
-from enum import Enum
-from typing import Any
-
-from .config import GuardedConfig
-from .edits import EditResult
-from .entries import Entry, body_problem
-from .store import ChangeResult, ContextStore, Snapshot
-
-REQUEST_ROLE = "observation"
-ANSWER_ROLE = "assistant"
+FORMAT = "clm-context/v1"
+ALLOWED_ROLES = frozenset({"assistant", "observation", "note", "summary", "receipt"})
+ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:~-]{0,63}$")
 
 
-class LifecycleError(RuntimeError):
-    """A lifecycle method was called in the wrong state (a host programming error)."""
+@dataclasses.dataclass(frozen=True)
+class Entry:
+    id: str
+    role: str
+    body: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {"id": self.id, "role": self.role, "body": self.body}
 
 
-class TurnState(Enum):
-    NOT_STARTED = "not_started"
-    ACTIVE = "active"  # the turn's request exists; no final answer yet
-    ANSWERED = "answered"  # the final answer is recorded; the next turn may start
+@dataclasses.dataclass(frozen=True)
+class ContextLimits:
+    max_file_bytes: int = 256_000
+    max_entries: int = 200
+    max_body_chars: int = 24_000
+    max_total_chars: int = 120_000
 
 
-@dataclass(frozen=True, slots=True)
-class RequestState:
-    """What the request builder needs for one request (SPEC §9.1)."""
-
-    turn: int
-    task: str
-    current_request: str | None  # None on turn 1: the first request is the task itself
-    snapshot: Snapshot
-
-
-@dataclass(frozen=True, slots=True)
-class PrepareResult:
-    ok: bool
-    state: RequestState | None = None
-    reason: str | None = None
-    materialised: tuple[str, ...] = ()  # turn-record IDs added by this call (empty on repeats)
+@dataclasses.dataclass(frozen=True)
+class Revision:
+    number: int
+    entries: tuple[Entry, ...]
+    sha256: str
+    parent: int | None
+    source: str  # "init" | "runtime" | "model_edit"
+    step: int
 
 
-def turn_request_id(turn: int) -> str:
-    return f"t{turn}.request"
+class ContextValidationError(ValueError):
+    """Edited entries violate the documented format or limits."""
 
 
-def turn_answer_id(turn: int) -> str:
-    return f"t{turn}.answer"
+def serialize(entries: tuple[Entry, ...] | list[Entry]) -> str:
+    doc = {"format": FORMAT, "entries": [e.to_dict() for e in entries]}
+    return json.dumps(doc, ensure_ascii=False, indent=1) + "\n"
 
 
-class GuardedContext:
-    """The library's main object: configuration, the authoritative store and the turn
-    lifecycle. Its methods are trusted host APIs (see ``store`` for the trust boundary)."""
+def content_hash(entries: tuple[Entry, ...] | list[Entry]) -> str:
+    canonical = json.dumps([e.to_dict() for e in entries], ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
-    def __init__(self, config: GuardedConfig) -> None:
-        if not isinstance(config, GuardedConfig):
-            raise TypeError("config must be a GuardedConfig")
-        self._config = config
-        self._store = ContextStore()
-        self._state = TurnState.NOT_STARTED
-        self._turn = 0
-        self._task: str | None = None
-        self._current_request: str | None = None
-        self._answer: str | None = None
-        self._pending: tuple[Entry, ...] = ()
-        self._prepared = False
 
-    # ------------------------------------------------------------ read-only views
-    @property
-    def config(self) -> GuardedConfig:
-        return self._config
+def total_chars(entries: tuple[Entry, ...] | list[Entry]) -> int:
+    return sum(len(e.body) for e in entries)
 
-    @property
-    def turn(self) -> int:
-        return self._turn
 
-    @property
-    def state(self) -> TurnState:
-        return self._state
+def render_entries(entries: tuple[Entry, ...] | list[Entry]) -> str:
+    """JSON lines with '<' escaped, so entry text cannot forge section tags."""
+    lines = [
+        json.dumps({"id": e.id, "role": e.role, "body": e.body}, ensure_ascii=False).replace("<", "\\u003c")
+        for e in entries
+    ]
+    return "\n".join(lines)
 
-    @property
-    def task(self) -> str | None:
-        return self._task
 
-    @property
-    def current_request(self) -> str | None:
-        return self._current_request
-
-    @property
-    def revision(self) -> int:
-        return self._store.revision
-
-    def snapshot(self) -> Snapshot:
-        return self._store.snapshot()
-
-    # ------------------------------------------------------------ lifecycle
-    def start_turn(self, request: str) -> int:
-        """Begin the next turn with a user request; returns the new turn number.
-
-        Turn 1's request becomes the task anchor. A later turn may start only after the previous
-        turn's final answer is recorded. The previous turn's records are materialised at the
-        next ``prepare_request()``.
-        """
-        if not isinstance(request, str) or not request.strip():
-            raise ValueError("a request must be a non-empty string")
-        if self._turn == 0:
-            # The task anchor is never an entry, so the body-length limit does not apply.
-            try:
-                request.encode("utf-8")
-            except UnicodeEncodeError:
-                raise ValueError("the request contains a lone surrogate") from None
-            self._task = request
-        elif self._state is not TurnState.ANSWERED:
-            raise LifecycleError(
-                f"turn {self._turn} has no recorded final answer; it cannot be followed yet"
+def parse_candidate(raw: bytes, limits: ContextLimits) -> tuple[Entry, ...]:
+    """Validate a serialized context and return its entries, or raise ContextValidationError."""
+    if len(raw) > limits.max_file_bytes:
+        raise ContextValidationError(f"file is {len(raw)} bytes; limit {limits.max_file_bytes}")
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ContextValidationError("file is not valid UTF-8") from exc
+    try:
+        doc = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ContextValidationError(f"invalid JSON: {exc.msg} at line {exc.lineno}") from exc
+    if not isinstance(doc, dict):
+        raise ContextValidationError("top level must be an object")
+    if set(doc) != {"format", "entries"}:
+        extra = sorted(set(doc) - {"format", "entries"})
+        missing = sorted({"format", "entries"} - set(doc))
+        raise ContextValidationError(f"top-level keys must be format, entries (extra={extra}, missing={missing})")
+    if doc["format"] != FORMAT:
+        raise ContextValidationError(f"format must be {FORMAT!r}")
+    items = doc["entries"]
+    if not isinstance(items, list):
+        raise ContextValidationError("entries must be a list")
+    if len(items) > limits.max_entries:
+        raise ContextValidationError(f"{len(items)} entries; limit {limits.max_entries}")
+    seen: set[str] = set()
+    out: list[Entry] = []
+    for i, item in enumerate(items):
+        if not isinstance(item, dict) or set(item) != {"id", "role", "body"}:
+            raise ContextValidationError(f"entry {i} must have exactly id, role, body")
+        eid, role, body = item["id"], item["role"], item["body"]
+        if not all(isinstance(v, str) for v in (eid, role, body)):
+            raise ContextValidationError(f"entry {i}: id, role, body must be strings")
+        if not ID_RE.match(eid):
+            raise ContextValidationError(f"entry {i}: invalid id {eid[:40]!r}")
+        if eid in seen:
+            raise ContextValidationError(f"duplicate id {eid!r}")
+        seen.add(eid)
+        if role not in ALLOWED_ROLES:
+            raise ContextValidationError(
+                f"entry {eid!r}: role {role[:20]!r} not allowed (allowed: {sorted(ALLOWED_ROLES)})"
             )
-        else:
-            problem = body_problem(request)
-            if problem:
-                # A later request becomes a working-context entry, so it must be a valid body.
-                raise ValueError(f"request cannot become a turn record: {problem}")
-            assert self._answer is not None
-            records = []
-            if self._turn >= 2:
-                assert self._current_request is not None
-                records.append(
-                    self._record(turn_request_id(self._turn), REQUEST_ROLE, self._current_request)
-                )
-            records.append(self._record(turn_answer_id(self._turn), ANSWER_ROLE, self._answer))
-            self._pending = tuple(records)
-            self._current_request = request
-        self._turn += 1
-        self._state = TurnState.ACTIVE
-        self._answer = None
-        self._prepared = False
-        return self._turn
+        if len(body) > limits.max_body_chars:
+            raise ContextValidationError(f"entry {eid!r}: body {len(body)} chars; limit {limits.max_body_chars}")
+        out.append(Entry(eid, role, body))
+    total = total_chars(out)
+    if total > limits.max_total_chars:
+        raise ContextValidationError(f"total body chars {total}; limit {limits.max_total_chars}")
+    return tuple(out)
 
-    def prepare_request(self) -> PrepareResult:
-        """The request-building hook (idempotent).
 
-        On the first call of a turn, it materialises the previous turn's records in one
-        revision. If they would break a structural limit, nothing changes, the result is a
-        failure, and the records stay pending. Later calls only return the current state.
-        """
-        if self._state is TurnState.NOT_STARTED:
-            raise LifecycleError("no turn has started")
-        if self._state is TurnState.ANSWERED:
-            raise LifecycleError(f"turn {self._turn} is answered; start the next turn first")
-        added: tuple[str, ...] = ()
-        if self._pending:
-            change = self._store._append_records(self._pending)
-            if not change.ok:
-                return PrepareResult(False, reason=f"turn records do not fit: {change.reason}")
-            added = change.added
-            self._pending = ()
-        self._prepared = True
-        assert self._task is not None
-        state = RequestState(self._turn, self._task, self._current_request, self._store.snapshot())
-        return PrepareResult(True, state, materialised=added)
+@dataclasses.dataclass
+class EditOutcome:
+    """The result of one edit."""
 
-    def submit_answer(self, answer: str) -> None:
-        """Record the current turn's final answer, exactly once.
+    status: str  # "unchanged_write" | "accepted" | "rejected"
+    reason: str = ""
+    before: Revision | None = None
+    after: Revision | None = None
 
-        Only this call creates a final-answer record; intermediate assistant output appended
-        as runtime entries never becomes one.
-        """
-        self._require_prepared("submit an answer")
-        if not isinstance(answer, str):
-            raise ValueError("an answer must be a string")
-        problem = body_problem(answer)
-        if problem:
-            raise ValueError(f"answer cannot become a turn record: {problem}")
-        self._answer = answer
-        self._state = TurnState.ANSWERED
 
-    # ------------------------------------------------------------ changes within a turn
-    def apply_edits(self, operations: Any, *, expected_revision: Any) -> EditResult:
-        """Apply a model edit transaction (SPEC §4) to the working context."""
-        self._require_prepared("apply edits")
-        return self._store.apply_edits(operations, expected_revision=expected_revision)
+@dataclasses.dataclass
+class ContextStore:
+    """The authoritative, host-side record of accepted context revisions."""
 
-    def append_runtime_entries(self, entries: Sequence[Entry]) -> ChangeResult:
-        """Append host-created runtime entries (for example ``sN.act``) in one revision."""
-        self._require_prepared("append runtime entries")
-        return self._store.append(entries)
+    limits: ContextLimits = dataclasses.field(default_factory=ContextLimits)
+    revisions: list[Revision] = dataclasses.field(default_factory=list)
 
-    # ------------------------------------------------------------ internals
-    def _record(self, entry_id: str, role: str, body: str) -> Entry:
-        return Entry(entry_id, role, body, protected=self._config.protect_turns)
+    def __post_init__(self) -> None:
+        if not self.revisions:
+            self.revisions.append(Revision(0, (), content_hash(()), None, "init", 0))
 
-    def _require_prepared(self, action: str) -> None:
-        if self._state is TurnState.ANSWERED:
-            raise LifecycleError(f"cannot {action}: turn {self._turn} is already answered")
-        if self._state is not TurnState.ACTIVE or not self._prepared:
-            raise LifecycleError(f"cannot {action} before the turn's first prepare_request()")
+    @property
+    def current(self) -> Revision:
+        return self.revisions[-1]
+
+    @property
+    def entries(self) -> tuple[Entry, ...]:
+        return self.current.entries
+
+    def commit(self, entries: tuple[Entry, ...] | list[Entry], source: str, step: int) -> Revision:
+        entries = tuple(entries)
+        rev = Revision(self.current.number + 1, entries, content_hash(entries), self.current.number, source, step)
+        self.revisions.append(rev)
+        return rev
+
+    def append(self, new: list[Entry], source: str, step: int) -> Revision:
+        """Append runtime entries; an id that collides with an existing one gets a `~N` suffix."""
+        existing = {e.id for e in self.entries}
+        fixed: list[Entry] = []
+        for e in new:
+            eid, n = e.id, 2
+            while eid in existing:
+                eid, n = f"{e.id}~{n}", n + 1
+            existing.add(eid)
+            fixed.append(Entry(eid, e.role, e.body))
+        return self.commit(self.entries + tuple(fixed), source, step)
