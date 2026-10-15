@@ -85,6 +85,7 @@ Each one, if taken up, changes behaviour, so it needs a decision and new transcr
 - **O12. An output that can never fit:** the guard asks the model to tidy and call again even when the output can't fit however much it tidies (SPEC 13.15). Should the model be told?
 - **O13. Publishing:** the package name's availability on public indexes is unverified, and no release is authorised.
 - **O14. The copyright line in NOTICE** names an individual, as the source's NOTICE did. Keep it, or use the project handle? This is the maintainer's choice; the notice is kept as received until then.
+- **O15. Version metadata:** `guarded_clm.__version__` (`0.1.0`, from the source) differs from the distribution version (`0.1.0.dev0`). Align them before a release; changing `__version__` is not model-visible, but it is a library change and needs a decision.
 
 ## Superseded (the preliminary core, 2026-10-15)
 

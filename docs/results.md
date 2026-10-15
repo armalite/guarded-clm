@@ -59,3 +59,8 @@ The built wheel was installed into fresh virtual environments, with only the whe
 | --- | --- | --- | --- |
 | 3.11.16 | pydantic-ai-slim 2.27.1, pydantic 2.14.1, pydantic-core 2.50.1 | ran, expected output | 57 passed |
 | 3.13.15 | the same versions | ran, expected output | 57 passed |
+
+## Packaging note
+
+`guarded_clm.__version__` is `"0.1.0"`, kept verbatim from the source implementation, while the distribution metadata (`pyproject.toml`) says `0.1.0.dev0`. This is not a behaviour difference, but the two should agree before a release. Recorded as open question O15 in [decisions.md](decisions.md).
+

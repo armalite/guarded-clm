@@ -16,8 +16,6 @@ This file links to those documents rather than repeating them.
 | --- | --- | --- |
 | 1 | Faithful implementation port, and reconciliation of the existing core | **done** (2026-10-15) |
 | 2 | Offline differential verification and packaging | **done** (2026-10-15) |
-| 3 | clm-lib integration, using the actual library at recorded provenance | planned |
-| 4 | Public experiments | planned; needs separate authorisation |
 
 ## 1. Faithful implementation port, and reconciliation of the existing core
 
@@ -58,22 +56,10 @@ This file links to those documents rather than repeating them.
 
   The results and their limits are in [results.md](results.md).
 
-## 3. clm-lib integration at recorded provenance
+## Scope of this plan
 
-- **Scope:**
-  - clm-lib imports guarded-clm at a recorded version or commit for programme 015's lite arm;
-  - run provenance records the library version;
-  - offline proof through clm-lib's real runner and sandbox, with no duplicate implementation in clm-lib.
-- **Initial integration target:** the tested Pydantic AI capability. clm-lib's own runner is not Pydantic AI based, so how it hosts the capability is the first design question of this step.
-- **Depends on:** step 2.
-- **Open decisions:**
-  - the hosting approach;
-  - the pinning mechanism;
-  - how the 015 lite arms map onto `clm_context()` settings.
-
-## 4. Public experiments
-
-Only after separate authorisation, with a frozen protocol in the results repository.
+This plan covers library work only. Downstream projects that use the library keep their own integration plans,
+experiments and results in their own repositories.
 
 ## Deferred, not part of this plan
 

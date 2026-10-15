@@ -55,4 +55,4 @@ SPEC.md section 12 has the details and their consequences.
 ## Boundaries
 
 - **The framework:** the library depends on Pydantic AI only, pinned to the tested minor. A provider-neutral core or a separate provider adapter is deferred ([implementation-plan.md](implementation-plan.md)). Either would need the same transcripts to pass through it.
-- **The experiment harness:** clm-lib, a separate repository, will import this library at a recorded version (plan step 3). It does not copy its logic.
+- **Users of the library** depend on it; it depends on none of them.
