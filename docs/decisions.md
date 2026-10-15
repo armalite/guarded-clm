@@ -2,18 +2,18 @@
 
 Behaviour is defined in [SPEC.md](../SPEC.md); the roadmap is in [implementation-plan.md](implementation-plan.md).
 
-- **Numbering:** P decisions concern this repository's port and packaging. L decisions are how the library carries the design. O items are open questions. L and O numbers follow the source implementation's records; L4, L6 and O9 concerned only its internal provenance and are omitted.
+- **Numbering:** P decisions concern packaging and verification. L decisions record how the library behaves by design. O items are open questions. Numbers are not consecutive: withdrawn items are not reused.
 - **Changes:** a decision changes only through a new entry that supersedes it, and a decision that changes behaviour must say how the stored transcripts change (AGENTS.md).
 
-## Port and packaging
+## Packaging and verification
 
-**P1 (2026-10-15). guarded-clm is a faithful port of an existing, tested implementation.**
-The preliminary core is retired:
+**P1 (2026-10-15). One implementation: the `ClmContext` capability.**
+An earlier, unreleased core in this repository is retired:
 - `GuardedConfig` and `GuardedContext`;
 - its store, edits and turn lifecycle;
 - its specification and decisions (D1 to D14, U1 to U11 below).
 
-It was rebuilt from an incomplete behavioural description and differed from the tested design. Among the differences:
+Its design differed from `ClmContext`. Among the differences:
 - the reserved namespaces and runtime-owned protection;
 - compact serialisation for the byte limit;
 - strict edit parsing;
@@ -30,20 +30,13 @@ Only one implementation exists. There are no compatibility aliases for the preli
   - the trace variant `clm_lite_v3_3` and the record types;
   - the capability id `clm_context`, the step limit's id `clm_step_limit` and the toolset id `clm_context_tools`.
 
-**P3 (2026-10-15). Only provenance prose changed in the source.**
-The source is the reference implementation's. The port changed only:
-- the package name in imports;
-- docstrings and comments, to remove non-required provenance.
-
-An AST comparison with the reference shows no other difference. The model-visible tool docstring is compared verbatim (results.md).
-
 **P4 (2026-10-15). Dependencies come from public PyPI, at the tested versions.**
 - **Runtime:** `pydantic-ai-slim>=2.27.1,<2.28`, the tested minor.
-- **The lockfile** is resolved from public PyPI only, and its versions equal the tested lock's.
+- **The lockfile** is resolved from public PyPI only, at the versions the stored transcripts were recorded with.
 - **A new Pydantic AI minor** needs the transcript tests to pass on it first. If they don't, adopting it is a behaviour decision.
 
 **P5 (2026-10-15). The public transcript tests use fresh synthetic scenarios.**
-32 scenarios cover the design's behaviours, with synthetic data. Their transcripts were recorded from an untouched reference copy and match the port byte for byte. Private recorded fixtures are not published.
+32 scenarios cover the design's behaviours, with synthetic data. Their transcripts were recorded once and are a regression contract (L1); they don't establish correctness independently of the implementation.
 
 ## Library decisions
 
@@ -84,16 +77,16 @@ Each one, if taken up, changes behaviour, so it needs a decision and new transcr
 - **O11. Unhashable ids crash the run:** an edit whose `ids` holds objects passes the schema, then raises `TypeError` and ends `agent.run` (SPEC 13.11). Reject it as an invalid edit instead?
 - **O12. An output that can never fit:** the guard asks the model to tidy and call again even when the output can't fit however much it tidies (SPEC 13.15). Should the model be told?
 - **O13. Publishing:** the package name's availability on public indexes is unverified, and no release is authorised.
-- **O14. The copyright line in NOTICE** names an individual, as the source's NOTICE did. Keep it, or use the project handle? This is the maintainer's choice; the notice is kept as received until then.
-- **O15. Version metadata:** `guarded_clm.__version__` (`0.1.0`, from the source) differs from the distribution version (`0.1.0.dev0`). Align them before a release; changing `__version__` is not model-visible, but it is a library change and needs a decision.
+- **O14. The copyright line in NOTICE** names an individual. Keep it, or use the project handle? This is the maintainer's choice; the notice is unchanged until then.
+- **O15. Version metadata:** `guarded_clm.__version__` (`0.1.0`) differs from the distribution version (`0.1.0.dev0`). Align them before a release; changing `__version__` is not model-visible, but it is a library change and needs a decision.
 
 ## Superseded (the preliminary core, 2026-10-15)
 
 Kept for the record; superseded by P1.
 
-- **Preliminary decisions D1 to D14** covered a stdlib-only core, protection as runtime metadata, reserved turn and step namespaces, no renaming of duplicates, compact serialisation for limits, `fullmatch` for ids, materialisation at preparation, role mapping, the task anchor, no same-transaction re-add, pressure before the limit, lifecycle states, the trust boundary, and no load/restore. **All are superseded.** The ported behaviour differs on most of them, and SPEC.md describes it.
-- **Preliminary unresolved items U1 to U11** are settled by the ported behaviour where it defines them, or carried as O items above:
-  - **escaping:** every `<` becomes `<` (SPEC 3);
+- **Preliminary decisions D1 to D14** covered a stdlib-only core, protection as runtime metadata, reserved turn and step namespaces, no renaming of duplicates, compact serialisation for limits, `fullmatch` for ids, materialisation at preparation, role mapping, the task anchor, no same-transaction re-add, pressure before the limit, lifecycle states, the trust boundary, and no load/restore. **All are superseded.** The current behaviour differs on most of them, and SPEC.md describes it.
+- **Preliminary unresolved items U1 to U11** are settled by the current behaviour where it defines them, or carried as O items above:
+  - **escaping:** every `<` is written as the JSON escape `\u003c` (SPEC 3);
   - **the call cap:** per run (SPEC 10);
   - **recovery:** re-arms within a turn and resets on a new turn (SPEC 9);
   - **the guard's held-output rules:** SPEC 7;

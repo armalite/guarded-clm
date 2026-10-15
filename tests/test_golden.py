@@ -1,9 +1,8 @@
 """ClmContext's behaviour is pinned: every scenario's transcript must match the stored one exactly.
 
 A transcript is every request the model saw (messages, instructions, tool definitions, settings), every trace
-record and how each run ended. The stored transcripts were recorded once and checked against an independent
-reference copy of the implementation (docs/results.md). A failure here means the behaviour changed: fix the library,
-never the stored transcript (SPEC.md, "Transcript tests").
+record and how each run ended. The stored transcripts were recorded once (docs/results.md). A failure here means
+the behaviour changed: fix the library, never the stored transcript (SPEC.md, "Transcript tests").
 """
 
 import json

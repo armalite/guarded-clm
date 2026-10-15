@@ -5,7 +5,7 @@
 **This document is normative.** The library must behave exactly as described here. `tests/test_golden.py` checks that against stored transcripts (section 15). Where this text and the transcripts disagree, the transcripts win, and this text is the bug.
 
 **Version history:**
-- **0.1.0.dev0 (2026-10-15):** a faithful port of an existing, tested implementation. It supersedes this repository's preliminary core and specification, which reconstructed the design independently and differed from it (docs/decisions.md, P1).
+- **0.1.0.dev0 (2026-10-15):** the first specification of `ClmContext`. It replaces an earlier, unreleased core in this repository, which had a different design (docs/decisions.md, P1).
 
 ## Contents
 
@@ -474,7 +474,7 @@ Timestamps, run ids, conversation ids, toolset ids and capability ids are left o
 
 **How they are used:** `tests/test_golden.py` runs the scenarios with `clm_context()` and requires transcripts identical to `tests/golden/data/`. `scripts/record_transcripts.py --check` does the same from the command line.
 
-**How they were made:** the stored transcripts were recorded once with `scripts/record_transcripts.py`. They were checked offline against an independent reference copy of the implementation, in a separate environment, and were identical (docs/results.md).
+**How they were made:** the stored transcripts were recorded once with `scripts/record_transcripts.py`. They are a regression contract: they show that behaviour has not changed since they were recorded, not that the behaviour is correct by an independent standard (docs/results.md).
 
 **What they cover:**
 

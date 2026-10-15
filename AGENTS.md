@@ -2,7 +2,7 @@
 
 ## Purpose and boundary
 
-guarded-clm publishes `ClmContext`, a Pydantic AI capability. The model manages its own working context within a token budget; the runtime validates edits, protects earlier turns and enforces the limit. The library is a faithful port of an existing, tested implementation (docs/decisions.md, P1).
+guarded-clm publishes `ClmContext`, a Pydantic AI capability. The model manages its own working context within a token budget; the runtime validates edits, protects earlier turns and enforces the limit.
 
 ## The prime directive: no behaviour drift
 
