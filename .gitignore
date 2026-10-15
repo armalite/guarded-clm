@@ -218,3 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# guarded-clm: local session handoff and local secrets (never published)
+/docs/HANDOFF.md
+.env.*
+*.env
