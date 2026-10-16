@@ -171,6 +171,9 @@ class ClmContext(AbstractCapability[Any]):
         limits: The working context's entry, body and total limits.
         on_record: Called with each trace record (a dict), for example to write JSONL or OpenTelemetry events.
         id: The capability id, unique within an agent's capabilities. It isn't sent to the model.
+        strict_ratio_learning: The shared estimator learns its new-text ratio only from a request that extends the
+            last answered one, and ignores an observation below 0.5 characters per token (decisions P6). Off by
+            default, as tested.
     """
 
     def __init__(
@@ -184,6 +187,7 @@ class ClmContext(AbstractCapability[Any]):
         limits: ContextLimits | None = None,
         on_record: Callable[[dict[str, Any]], None] | None = None,
         id: str = "clm_context",
+        strict_ratio_learning: bool = False,
     ) -> None:
         self.id = id
         self.description = "The model manages its own working context within a token budget."
@@ -196,6 +200,7 @@ class ClmContext(AbstractCapability[Any]):
         self.call_cap = call_cap
         self.limits = limits or ContextLimits()
         self.on_record = on_record
+        self.strict_ratio_learning = strict_ratio_learning
         # Per conversation, shared by `for_run`'s clones.
         self.sessions: ConversationStore[Session] = ConversationStore(lambda: Session(store=ContextStore(self.limits)))
         self.estimators: ConversationStore[SizeEstimator] = ConversationStore(SizeEstimator)
@@ -223,6 +228,7 @@ class ClmContext(AbstractCapability[Any]):
             limits=self.limits,
             on_record=self.on_record,
             id=self.id or "clm_context",  # the same id, so `resolve()` finds this clone
+            strict_ratio_learning=self.strict_ratio_learning,
         )
         key = ctx.conversation_id or ctx.run_id or "session"
         clone.sessions, clone.estimators = self.sessions, self.estimators
@@ -649,6 +655,7 @@ class ClmContext(AbstractCapability[Any]):
         density = self.density()
         sent, before = density.sent, density.answered
         tokens = response.usage.input_tokens
+        extended = False  # for strict ratio learning (decisions P6)
         if sent is not None and tokens:
             if before is not None:
                 chars, lines, task = sent
@@ -656,9 +663,14 @@ class ClmContext(AbstractCapability[Any]):
                 extends = task == old_task and lines[: len(old_lines)] == old_lines
                 if extends and chars > old_chars and tokens > old_tokens:
                     density.lowest = min(density.lowest, (chars - old_chars) / (tokens - old_tokens))
+                # The same test, except that an empty working context (rendered as one empty line) is a prefix of
+                # any other.
+                extended = extends or (task == old_task and old_lines == ("",))
             density.answered = (*sent, tokens)
         session.calls_this_run += 1
-        self.estimator.record(ctx.model, response.usage.input_tokens)
+        self.estimator.record(
+            ctx.model, response.usage.input_tokens, strict=self.strict_ratio_learning, extends=extended
+        )
         calls = [p for p in response.parts if isinstance(p, ToolCallPart)]
         if len(calls) > 1:
             self.record({"type": "lite_parallel_calls", "calls": [c.tool_name for c in calls[1:]]})

@@ -18,6 +18,8 @@ INITIAL_CHARS_PER_TOKEN = 4.0
 # Starting characters-per-token for text added since the last call; it only ever moves down.
 INITIAL_NEW_TEXT_CHARS_PER_TOKEN = 2.5
 MIN_NEW_TEXT_TOKENS = 200
+# With strict ratio learning, a new-text observation below this is ignored as implausible (decisions P6).
+MIN_PLAUSIBLE_NEW_TEXT_CHARS_PER_TOKEN = 0.5
 # Scripted models report made-up usage, so their usage is never used to calibrate.
 SCRIPTED_MODEL_SYSTEMS = frozenset({"function", "test"})
 MAX_CONVERSATIONS = 512
@@ -89,6 +91,11 @@ class Calibration:
     run at 2 characters per token while the instructions and earlier turns run at 3 to 4. The overall ratio moves
     halfway towards each call's observed figure. The new-text ratio starts at a conservative 2.5 and keeps the lowest
     value seen, so the estimate errs early (more tokens) rather than late.
+
+    A request counts as appended when it is no smaller than the last one, so a step that removed about as much as it
+    added can teach a new-text ratio far too low (SPEC 13.16). With strict ratio learning (decisions P6), the
+    new-text ratio learns only from a request that extends the last answered one, and ignores an observation below
+    0.5 characters per token.
     """
 
     chars_per_token: float = INITIAL_CHARS_PER_TOKEN
@@ -115,8 +122,14 @@ class Calibration:
         self.pending_chars = chars
         self.pending_appended = appended
 
-    def record_usage(self, reported_input: int, *, real_usage: bool) -> None:
-        """After a call: update both ratios from the reported input, and set the anchor."""
+    def record_usage(
+        self, reported_input: int, *, real_usage: bool, strict: bool = False, extends: bool = False
+    ) -> None:
+        """After a call: update both ratios from the reported input, and set the anchor.
+
+        `strict`: strict ratio learning. `extends`: the request extended the last answered one (same task, and the
+        old entry lines are a prefix of the new). Both only affect the new-text ratio.
+        """
         chars, appended = self.pending_chars, self.pending_appended
         self.pending_chars, self.pending_appended = None, False
         if not real_usage or not chars or reported_input <= 0:
@@ -127,7 +140,8 @@ class Calibration:
             # Small additions are too noisy to calibrate on.
             if added_chars > 0 and added_tokens >= MIN_NEW_TEXT_TOKENS:
                 observed = added_chars / added_tokens
-                self.new_text_chars_per_token = round(min(self.new_text_chars_per_token, observed), 4)
+                if not strict or (extends and observed >= MIN_PLAUSIBLE_NEW_TEXT_CHARS_PER_TOKEN):
+                    self.new_text_chars_per_token = round(min(self.new_text_chars_per_token, observed), 4)
         self.chars_per_token = round(0.5 * self.chars_per_token + 0.5 * chars / reported_input, 4)
         self.last_request_chars = chars
         self.last_reported_input = reported_input
@@ -174,5 +188,7 @@ class SizeEstimator:
         self.calibration.begin_request(chars, appended=appended)
         self.last_chars = chars
 
-    def record(self, model: Model, input_tokens: int) -> None:
-        self.calibration.record_usage(input_tokens, real_usage=reports_real_usage(model))
+    def record(self, model: Model, input_tokens: int, *, strict: bool = False, extends: bool = False) -> None:
+        self.calibration.record_usage(
+            input_tokens, real_usage=reports_real_usage(model), strict=strict, extends=extends
+        )

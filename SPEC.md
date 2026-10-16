@@ -50,11 +50,12 @@ agent = Agent(model, capabilities=[clm_context()])
 await agent.run(prompt, conversation_id=cid, message_history=history, usage_limits=UsageLimits(request_limit=CALL_CAP))
 ```
 
-- **`clm_context(*, budget_tokens=32_000, max_steps=60, call_cap=None, end_over_budget=False, max_output_chars=8_000, limits=None, on_record=None, id="clm_context")`** returns a `CombinedCapability` of `ClmStepLimit(max_steps, call_cap=cap)`, then `ClmContext(...)`, in that order. `cap` is `call_cap`, or `2 × max_steps + 24` (144 by default). Pydantic AI flattens a combined capability into its leaves, so this is the same as listing the two.
-- **`ClmContext(*, budget_tokens=32_000, end_over_budget=False, max_output_chars=8_000, max_steps=60, call_cap=144, limits=None, on_record=None, id="clm_context")`:**
+- **`clm_context(*, budget_tokens=32_000, max_steps=60, call_cap=None, end_over_budget=False, max_output_chars=8_000, limits=None, on_record=None, id="clm_context", strict_ratio_learning=False)`** returns a `CombinedCapability` of `ClmStepLimit(max_steps, call_cap=cap)`, then `ClmContext(...)`, in that order. `cap` is `call_cap`, or `2 × max_steps + 24` (144 by default). Pydantic AI flattens a combined capability into its leaves, so this is the same as listing the two.
+- **`ClmContext(*, budget_tokens=32_000, end_over_budget=False, max_output_chars=8_000, max_steps=60, call_cap=144, limits=None, on_record=None, id="clm_context", strict_ratio_learning=False)`:**
   - `max_steps` and `call_cap` are only shown in the runtime status. `ClmStepLimit` enforces them.
   - `max_output_chars` caps the `edit_context` tool's result (section 6.4).
   - `limits` is a `ContextLimits(max_file_bytes=256_000, max_entries=200, max_body_chars=24_000, max_total_chars=120_000)`.
+  - `strict_ratio_learning` restricts how the shared estimator learns its new-text ratio (section 8, decisions P6). Off by default, as tested.
   - `id` is the capability id (L9). Pydantic AI requires ids to be unique within an agent's capabilities, so pass another one when a different capability already uses `clm_context`. `for_run` gives each run's copy the same id, and the edit tool finds that copy by it.
 - **`ClmStepLimit(max_steps=60, *, call_cap=None, finalize=True)`:** section 10.
 - **Errors**, all `pydantic_ai.exceptions.AgentRunError`:
@@ -312,13 +313,20 @@ Request size is estimated per conversation (`SizeEstimator` with a `Calibration`
 | Method | When | Tokens |
 |---|---|---|
 | `fixed_ratio` | Scripted models (`model.system` is `function` or `test`) | `round(chars / 4)` |
-| `anchored` | Nothing removed since the last request, and calibrated | last reported input + `round(added chars / new-text ratio)` |
+| `anchored` | The request is no smaller than the last one (counted as "appended"), and calibrated | last reported input + `round(added chars / new-text ratio)` |
 | `calibrated` | Otherwise | `round(chars / ratio)`; before any usage, `round(chars / new-text ratio)` |
 
 **How the ratios update**, after each call with real usage:
 
 - **The overall ratio** moves halfway to `chars / reported`.
-- **The new-text ratio** (from 2.5) keeps the lowest `added chars / added tokens`, for additions of at least 200 tokens.
+- **The new-text ratio** (from 2.5) keeps the lowest `added chars / added tokens`, for additions of at least 200 tokens, from a request counted as appended (no smaller than the last one).
+
+**Strict ratio learning** (`strict_ratio_learning=True`, decisions P6; off by default). Only the new-text ratio's update changes:
+
+1. **Only extending requests teach it.** The request must extend the last answered one: the same task, and the last answered request's entry lines a prefix of this one's. This is the guard's own test (section 7), except that an empty working context counts as a prefix of any other. A request that grew in size without extending the last one (for example, after an edit that removed about as much as the step added) doesn't update the new-text ratio.
+2. **A backstop:** an observation below 0.5 characters per token is ignored as implausible.
+
+The estimate methods, the overall ratio, the guard, notices, trace records and endings are unchanged. On a run where every request extends the last answered one, learning is identical to the default. The first call of a later turn changes the task, so it doesn't teach the new-text ratio under strict learning.
 
 **This is the shared estimator.** The status line, PRESSURE and the limit checks use it. The guard uses it for its base, and its own r for the added text.
 
@@ -449,6 +457,13 @@ Each of these is the implemented behaviour, kept exactly. Changing any of them i
     - **What it means:** the model is asked to tidy and call again, and it may tidy and refetch until the step limit or the call cap ends the run.
     - **An example:** the `never_fits` scenario uses a 6,000-token budget (limit 3,952) and a 7,000-character output: it is held back before and after the model tidies.
     - **At the defaults it doesn't arise for capped outputs:** with a 32,000 budget (limit 29,952) and tool outputs capped at 8,000 characters, an output costs at most about 5,900 tokens at r = 1.5, far below the room left once the context is tidied.
+
+16. **One non-extending step can collapse the new-text ratio** (the default; `strict_ratio_learning` is off).
+    - **Why:** a request counts as appended whenever it is no smaller than the last one (section 8), and the new-text ratio only ever moves down.
+    - **What happens:** when an edit removes about as much text as the step adds, the request can grow by a few characters while the reported input rises by hundreds of tokens. The new-text ratio then drops far below any real density and stays there.
+    - **What it means:** later anchored estimates are many times too large. The over-limit check can end the run ("over the budget itself") although no reported input came near the budget. The guard is unaffected: its own r learns only from extending requests (section 7).
+    - **An example, with synthetic numbers:** a request that grew by 40 characters while the reported input rose by 250 tokens sets the ratio to 0.16. A later request adding 30,000 characters is then estimated at about 195,750 tokens, against a limit of 29,952.
+    - **The option:** `strict_ratio_learning=True` (section 8) learns only from extending requests and ignores implausible observations (decisions P6).
 
 ## 14. The default settings and their assumptions
 

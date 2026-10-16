@@ -38,6 +38,18 @@ Only one implementation exists. There are no compatibility aliases for the preli
 **P5 (2026-10-15). The public transcript tests use fresh synthetic scenarios.**
 32 scenarios cover the design's behaviours, with synthetic data. Their transcripts were recorded once and are a regression contract (L1); they don't establish correctness independently of the implementation.
 
+**P6 (2026-10-16). Strict ratio learning, behind an option that is off by default; version 0.2.0.dev0.**
+- **Why:** the shared estimator counts a request as appended whenever it is no smaller than the last one, and its new-text ratio only moves down (SPEC 8). In a long session with real usage, an edit removed about as much text as the step added. The request grew by a few dozen characters while the reported input rose by a few hundred tokens, so the ratio fell far below any real text density. A later over-limit check then estimated a request at several times the budget and ended the run ("over the budget itself"), although no reported input had come near the limit. The guard behaved correctly, because its own r learns only from requests that extend the last answered one (SPEC 13.16).
+- **The option:** `strict_ratio_learning` on `ClmContext` and `clm_context()`. When it is on:
+  - the new-text ratio learns only from a request that extends the last answered one, by the guard's test. An empty working context counts as a prefix, so that a run whose requests only append learns exactly as with the option off;
+  - an observation below 0.5 characters per token is ignored.
+
+  Nothing else changes: not the estimate methods, the overall ratio, the guard, notices, records or endings (SPEC 8).
+- **Off by default** until evidence supports making it the default. With it off, the behaviour is exactly as before.
+- **The stored transcripts are unchanged:** none of them sets the option, and all 32 pass as recorded (docs/results.md).
+- **If it were the default,** 1 of the 32 would change, by an offline comparison that wrote nothing: `over_budget_ignored`, where the reported input jumps by 40,000 tokens. The backstop ignores that observation, so the run's final `context_limit` record and error estimate about 42,574 tokens instead of 95,668. The calls and the ending are the same. Making the option the default needs a new decision and new transcripts.
+- **Version:** the distribution version and `guarded_clm.__version__` are both `0.2.0.dev0`, which closes O15.
+
 ## Library decisions
 
 **L1. Exact behaviour is the contract.**
@@ -78,7 +90,7 @@ Each one, if taken up, changes behaviour, so it needs a decision and new transcr
 - **O12. An output that can never fit:** the guard asks the model to tidy and call again even when the output can't fit however much it tidies (SPEC 13.15). Should the model be told?
 - **O13. Publishing:** the package name's availability on public indexes is unverified, and no release is authorised.
 - **O14. The copyright line in NOTICE** names an individual. Keep it, or use the project handle? This is the maintainer's choice; the notice is unchanged until then.
-- **O15. Version metadata:** `guarded_clm.__version__` (`0.1.0`) differs from the distribution version (`0.1.0.dev0`). Align them before a release; changing `__version__` is not model-visible, but it is a library change and needs a decision.
+- **O15. Version metadata:** closed by P6. Both versions are `0.2.0.dev0`.
 
 ## Superseded (the preliminary core, 2026-10-15)
 

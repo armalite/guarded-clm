@@ -2,6 +2,26 @@
 
 **Offline verification only.** There are no model runs, no provider calls and no performance findings. Nothing here measures task quality, cost or speed with a real model.
 
+## 2026-10-16: strict ratio learning (0.2.0.dev0)
+
+The `strict_ratio_learning` option (decisions P6, SPEC 8 and 13.16), off by default. Offline only: scripted models, no provider calls.
+
+- **`make check` passes:**
+  - ruff check, and ruff format over src, tests, scripts and examples;
+  - pyright (`-p pyproject.toml`): 0 errors;
+  - pytest: 64 passed. That is the 57 earlier tests unchanged, plus 7 new ones in `test_clm_context.py`.
+- **`make transcripts-check` passes:** all 32 stored transcripts are identical. None was re-recorded.
+- **The new tests,** with synthetic numbers and a scripted model whose `system` reports real usage:
+  - **the calibration pattern:** a step that grew by 40 characters while the reported input rose by 250 tokens. With the option off, the new-text ratio falls to 0.16, and a later request adding 30,000 characters is estimated at 195,750 tokens. With it on, the ratio stays 2.0, and the estimate is 23,250, within the 29,952 limit;
+  - **the backstop:** an extending step observed at 0.33 characters per token is ignored;
+  - **append-only learning:** on extending steps, the calibration is identical with the option off and on;
+  - **end to end:** a run whose second response deletes the first output and reads a similar-sized page, so the request grows by a few characters while the reported input rises by hundreds of tokens. With the option off, the run ends on the context limit ("over the budget itself"), though no reported input passed about 6,000 tokens. With it on, it completes;
+  - **a purely appending run:** with the option off and on, the requests, trace records and calibration are identical.
+- **The prefix rule matters:** with the guard's test used literally, an empty working context isn't a prefix. Then the first step of every run wouldn't teach the ratio under strict learning, and the purely appending test fails. That was checked by temporarily changing the code, then restoring it.
+- **If the option were the default:** an offline comparison that wrote nothing found 1 of the 32 transcripts would differ, `over_budget_ignored`. Its final estimate would be 42,574 tokens instead of 95,668, with the same calls and ending.
+- **Build:** `uv build` produces `guarded_clm-0.2.0.dev0` (wheel and sdist). The wheel's metadata says `0.2.0.dev0`, as does `guarded_clm.__version__`.
+- **The lockfile:** only the project's own version line changed.
+
 ## 2026-10-15: offline verification
 
 **The public suite:** the 32 synthetic scenarios' stored transcripts, and the unit and path tests (see "Public suite and packaging" below). The transcripts are a regression contract. Their only normalisation is the scrubbing of timestamps, run ids, conversation ids, toolset ids and capability ids; prompt wording, token estimates, entry order, revisions, guard decisions, counters, records and errors are compared exactly.
@@ -39,5 +59,5 @@ The built wheel was installed into fresh virtual environments, with only the whe
 
 ## Packaging note
 
-`guarded_clm.__version__` is `"0.1.0"`, while the distribution metadata (`pyproject.toml`) says `0.1.0.dev0`. This is not a behaviour difference, but the two should agree before a release. Recorded as open question O15 in [decisions.md](decisions.md).
+`guarded_clm.__version__` is `"0.1.0"`, while the distribution metadata (`pyproject.toml`) says `0.1.0.dev0`. This is not a behaviour difference, but the two should agree before a release. Recorded as open question O15 in [decisions.md](decisions.md). **Closed on 2026-10-16 (P6):** both are `0.2.0.dev0`.
 
