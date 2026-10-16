@@ -22,7 +22,7 @@ from guarded_clm.errors import BudgetExceededError, ContextLimitError, StepLimit
 from guarded_clm.estimate import RESERVE_TOKENS
 from guarded_clm.steps import ClmStepLimit, lm_call_cap
 
-__version__ = "0.2.0.dev0"
+__version__ = "0.2.0.dev1"
 
 BUDGET_TOKENS = 32_000
 MAX_STEPS = 60
@@ -39,7 +39,6 @@ def clm_context(
     limits: ContextLimits | None = None,
     on_record: Callable[[dict[str, Any]], None] | None = None,
     id: str = "clm_context",
-    strict_ratio_learning: bool = False,
 ) -> CombinedCapability[Any]:
     """ClmContext as tested: `ClmStepLimit` (free edit steps, the call cap, the finalize notice), then `ClmContext`.
 
@@ -53,8 +52,6 @@ def clm_context(
         on_record: Called with each trace record.
         id: ClmContext's capability id, if another capability already uses `clm_context`. ClmStepLimit's id is
             `clm_step_limit`.
-        strict_ratio_learning: The shared estimator learns its new-text ratio only from requests that extend the
-            last answered one, and ignores implausible observations (decisions P6). Off by default.
     """
     cap = call_cap if call_cap is not None else lm_call_cap(max_steps)
     return CombinedCapability(
@@ -69,7 +66,6 @@ def clm_context(
                 limits=limits,
                 on_record=on_record,
                 id=id,
-                strict_ratio_learning=strict_ratio_learning,
             ),
         ]
     )

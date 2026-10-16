@@ -26,7 +26,13 @@ from guarded_clm import (
 )
 from guarded_clm.capability import cap, is_protected, receipt, render_marked, short_args
 from guarded_clm.context import ContextStore, ContextValidationError, EditOutcome, Entry, parse_candidate, serialize
-from guarded_clm.estimate import Calibration, ConversationStore, enforced_limit, request_chars
+from guarded_clm.estimate import (
+    MIN_PLAUSIBLE_NEW_TEXT_CHARS_PER_TOKEN,
+    Calibration,
+    ConversationStore,
+    enforced_limit,
+    request_chars,
+)
 from guarded_clm.instructions import INSTRUCTIONS, instructions
 
 
@@ -282,56 +288,39 @@ def test_conversation_state_keeps_the_512_most_recent_conversations() -> None:
     assert store.get("c512") is store.get("c512")
 
 
-# ---------------------------------------------------------------------- strict ratio learning (decisions P6)
+# ---------------------------------------------------------------------- the implausible-observation backstop (P7)
 
 
-def collapse(calibration: Calibration, *, strict: bool) -> None:
+def test_an_edit_like_step_with_tiny_growth_does_not_lower_the_new_text_ratio() -> None:
     """Synthetic real-usage calls: an appended step at 2.0 characters a token, then a step whose edit removed about
-    as much as it added: the request grew by 40 characters while the reported input rose by 250 tokens."""
+    as much as it added: the request grew by 40 characters while the reported input rose by 250 tokens (0.16)."""
+    calibration = Calibration()
     calibration.begin_request(10_000, appended=True)
-    calibration.record_usage(4_000, real_usage=True, strict=strict, extends=False)  # the first call
+    calibration.record_usage(4_000, real_usage=True)  # the first call
     calibration.begin_request(18_000, appended=True)
-    calibration.record_usage(8_000, real_usage=True, strict=strict, extends=True)  # 8,000 characters at 4,000 tokens
+    calibration.record_usage(8_000, real_usage=True)  # 8,000 characters at 4,000 tokens
     calibration.begin_request(18_040, appended=True)  # no smaller than the last, so "appended" by size
-    calibration.record_usage(8_250, real_usage=True, strict=strict, extends=False)
-
-
-def test_without_strict_learning_a_non_extending_step_collapses_the_new_text_ratio() -> None:
-    calibration = Calibration()
-    collapse(calibration, strict=False)
-    assert calibration.new_text_chars_per_token == 0.16  # 40 characters / 250 tokens
-    tokens, method = calibration.estimate(48_040, real_usage=True, appended=True)  # 30,000 characters added
-    assert method == "anchored" and tokens == 195_750 > enforced_limit(32_000)
-
-
-def test_with_strict_learning_a_non_extending_step_leaves_the_new_text_ratio() -> None:
-    calibration = Calibration()
-    collapse(calibration, strict=True)
-    assert calibration.new_text_chars_per_token == 2.0  # learnt from the extending step only
+    calibration.record_usage(8_250, real_usage=True)
+    assert calibration.new_text_chars_per_token == 2.0  # the 0.16 observation is ignored
+    # 30,000 characters added are priced at 2.0, within the limit (at 0.16 it would be 195,750 tokens)
     assert calibration.estimate(48_040, real_usage=True, appended=True) == (23_250, "anchored")
     assert enforced_limit(32_000) >= 23_250
 
 
-def test_strict_learning_ignores_an_implausible_observation_even_from_an_extending_step() -> None:
+def test_observations_at_or_above_the_backstop_still_lower_the_new_text_ratio() -> None:
+    assert MIN_PLAUSIBLE_NEW_TEXT_CHARS_PER_TOKEN == 0.5
     calibration = Calibration()
     calibration.begin_request(10_000, appended=True)
-    calibration.record_usage(4_000, real_usage=True, strict=True, extends=False)
-    calibration.begin_request(10_100, appended=True)
-    calibration.record_usage(4_300, real_usage=True, strict=True, extends=True)  # 100 / 300: 0.33
-    assert calibration.new_text_chars_per_token == 2.5
-    calibration.begin_request(10_500, appended=True)
-    calibration.record_usage(4_500, real_usage=True, strict=True, extends=True)  # 400 / 200: 2.0
+    calibration.record_usage(4_000, real_usage=True)
+    calibration.begin_request(10_400, appended=True)
+    calibration.record_usage(4_200, real_usage=True)  # 400 / 200: 2.0
     assert calibration.new_text_chars_per_token == 2.0
-
-
-def test_strict_learning_matches_the_default_on_extending_steps() -> None:
-    sizes = [(10_000, 4_000), (14_000, 5_800), (19_000, 8_300), (19_150, 8_400), (25_000, 11_200)]
-    default, strict = Calibration(), Calibration()
-    for calibration, is_strict in ((default, False), (strict, True)):
-        for chars, reported in sizes:
-            calibration.begin_request(chars, appended=True)
-            calibration.record_usage(reported, real_usage=True, strict=is_strict, extends=True)
-    assert default == strict and default.new_text_chars_per_token < 2.5
+    calibration.begin_request(10_500, appended=True)
+    calibration.record_usage(4_400, real_usage=True)  # 100 / 200: exactly 0.5, which counts
+    assert calibration.new_text_chars_per_token == 0.5
+    calibration.begin_request(10_599, appended=True)
+    calibration.record_usage(4_600, real_usage=True)  # 99 / 200: just below 0.5, ignored
+    assert calibration.new_text_chars_per_token == 0.5
 
 
 class ProviderUsageModel(FunctionModel):
@@ -345,97 +334,42 @@ def read_page(n: int, size: int) -> str:
     return f"page {n}: " + " ".join(f"line{i:05d}" for i in range(size // 10))[:size]
 
 
-class UsageScript(Script):
-    """Plays responses and reports provider-like input tokens: the request's characters at 2.4 characters a token,
-    or, on the calls in `rises`, the last reported input plus ten tokens per character the request grew by (at
-    least 250), as when an edit removes about as much as a step adds."""
+def test_an_edit_and_read_step_with_a_large_token_jump_does_not_end_the_run() -> None:
+    """End to end with default settings: the second response deletes the first page and reads one of about the same
+    size, so the request grows by a few characters. The model then reports ten tokens per character of growth (at
+    least 250), an observation far below 0.5. The run still completes, and the ratio is unchanged by it."""
+    seen: list[int] = []
+    reported: list[int] = []
+    responses = [
+        call("read_page", {"n": 1, "size": 3_000}, "p1"),
+        ModelResponse(
+            parts=[
+                ToolCallPart("edit_context", {"ops": [{"op": "delete", "ids": ["s1.obs"]}]}, "e1"),
+                ToolCallPart("read_page", {"n": 2, "size": 2_640}, "p2"),  # the request grows by a few characters
+            ]
+        ),
+        call("read_page", {"n": 3, "size": 6_000}, "p3"),
+        text("done"),
+    ]
 
-    def __init__(self, responses: list[ModelResponse], rises: frozenset[int] = frozenset()) -> None:
-        super().__init__(responses)
-        self.rises, self.reported, self.chars = rises, [], []
+    def respond(messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
+        chars = request_chars(messages)
+        index = len(seen)
+        tokens = reported[-1] + max(250, 10 * (chars - seen[-1])) if index == 2 else math.ceil(chars / 2.4)
+        seen.append(chars)
+        reported.append(tokens)
+        return dataclasses.replace(responses[index], usage=RequestUsage(input_tokens=tokens, output_tokens=10))
 
-    def model(self) -> FunctionModel:
-        def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
-            self.seen.append(messages)
-            index = len(self.seen) - 1
-            chars = request_chars(messages)
-            if index in self.rises:
-                tokens = self.reported[-1] + max(250, 10 * (chars - self.chars[-1]))
-            else:
-                tokens = math.ceil(chars / 2.4)
-            self.chars.append(chars)
-            self.reported.append(tokens)
-            response = self.responses[index]
-            return dataclasses.replace(response, usage=RequestUsage(input_tokens=tokens, output_tokens=10))
-
-        return ProviderUsageModel(respond)
-
-
-def run_with_usage(script: UsageScript, *, strict: bool) -> tuple[ClmContext, list[dict[str, Any]], Any]:
     records: list[dict[str, Any]] = []
-    context = ClmContext(on_record=records.append, strict_ratio_learning=strict)
-    agent = Agent(script.model(), system_prompt="SYSTEM", tools=[read_page], capabilities=[ClmStepLimit(), context])
-    try:
-        outcome: Any = asyncio.run(
-            agent.run("Investigate.", conversation_id="c", usage_limits=UsageLimits(request_limit=CALL_CAP))
-        )
-    except AgentRunError as error:
-        outcome = error
-    return context, records, outcome
-
-
-def collapse_script() -> UsageScript:
-    return UsageScript(
-        [
-            call("read_page", {"n": 1, "size": 3_000}, "p1"),
-            ModelResponse(
-                parts=[
-                    ToolCallPart("edit_context", {"ops": [{"op": "delete", "ids": ["s1.obs"]}]}, "e1"),
-                    ToolCallPart("read_page", {"n": 2, "size": 2_640}, "p2"),  # the request grows by a few characters
-                ]
-            ),
-            call("read_page", {"n": 3, "size": 6_000}, "p3"),
-            text("done"),
-        ],
-        rises=frozenset({2}),
+    context = ClmContext(on_record=records.append)
+    agent = Agent(
+        ProviderUsageModel(respond), system_prompt="SYSTEM", tools=[read_page], capabilities=[ClmStepLimit(), context]
     )
-
-
-def test_a_non_extending_step_ends_the_run_without_strict_learning() -> None:
-    script = collapse_script()
-    context, records, outcome = run_with_usage(script, strict=False)
-    assert isinstance(outcome, ContextLimitError)
-    [ending] = [r for r in records if r["type"] == "context_limit"]
-    assert ending["reason"] == "over the budget itself" and ending["estimated_tokens"] > 32_000
-    assert max(script.reported) < 10_000  # no reported input came near the budget
-    assert context.estimators.get("c").calibration.new_text_chars_per_token < 0.5
-
-
-def test_strict_learning_keeps_the_estimate_in_range_after_a_non_extending_step() -> None:
-    script = collapse_script()
-    context, records, outcome = run_with_usage(script, strict=True)
-    assert outcome.output == "done"
+    result = asyncio.run(
+        agent.run("Investigate.", conversation_id="c", usage_limits=UsageLimits(request_limit=CALL_CAP))
+    )
+    assert result.output == "done"
+    assert 0 < seen[2] - seen[1] < 100 and reported[2] - reported[1] >= 250  # the pattern the backstop is for
     assert not [r for r in records if r["type"] in ("context_limit", "lite_over_limit")]
     assert any(r["type"] == "lite_edit" and r["status"] == "accepted" for r in records)  # s1.obs was deleted
-    assert context.estimators.get("c").calibration.new_text_chars_per_token > 2.0
-
-
-def test_strict_learning_is_identical_on_a_purely_appending_run() -> None:
-    def appending() -> UsageScript:
-        return UsageScript(
-            [
-                call("read_page", {"n": 1, "size": 3_000}, "p1"),
-                call("read_page", {"n": 2, "size": 4_000}, "p2"),
-                call("read_page", {"n": 3, "size": 2_000}, "p3"),
-                text("done"),
-            ]
-        )
-
-    default_script, strict_script = appending(), appending()
-    default, default_records, default_outcome = run_with_usage(default_script, strict=False)
-    strict, strict_records, strict_outcome = run_with_usage(strict_script, strict=True)
-    assert default_outcome.output == strict_outcome.output == "done"
-    assert [user_text(m) for m in default_script.seen] == [user_text(m) for m in strict_script.seen]
-    assert default_records == strict_records
-    learnt = default.estimators.get("c").calibration
-    assert learnt == strict.estimators.get("c").calibration and learnt.new_text_chars_per_token < 2.5
+    assert context.estimators.get("c").calibration.new_text_chars_per_token > 2.0  # learnt from step 2 only

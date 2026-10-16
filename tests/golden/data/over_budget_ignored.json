@@ -863,30 +863,30 @@
     "type": "lite_guard_check",
     "step": 2,
     "r": 1.5,
-    "shared_base": 42668,
+    "shared_base": 42468,
     "added_chars": 204,
     "conservative_added": 150,
-    "projected": 42818
+    "projected": 42618
    },
    {
     "variant": "clm_lite_v3_3",
     "type": "lite_guard_check",
     "step": 2,
     "r": 1.5,
-    "shared_base": 42668,
+    "shared_base": 42468,
     "added_chars": 149,
     "conservative_added": 110,
-    "projected": 42778
+    "projected": 42578
    },
    {
     "variant": "clm_lite_v3_3",
     "type": "lite_guard_check",
     "step": 2,
     "r": 1.5,
-    "shared_base": 42668,
+    "shared_base": 42468,
     "added_chars": 204,
     "conservative_added": 150,
-    "projected": 42818
+    "projected": 42618
    },
    {
     "variant": "clm_lite_v3_3",
@@ -897,14 +897,14 @@
     "estimated_tokens": 40,
     "free_tokens": 0,
     "r": 1.5,
-    "shared_estimate": 109268,
-    "conservative_estimate": 42818
+    "shared_estimate": 42602,
+    "conservative_estimate": 42618
    },
    {
     "variant": "clm_lite_v3_3",
     "type": "context_limit",
     "source": "agent",
-    "estimated_tokens": 95668,
+    "estimated_tokens": 42574,
     "limit_tokens": 29952,
     "reason": "over the budget itself"
    }
@@ -913,7 +913,7 @@
    {
     "prompt": "Go.",
     "calls": 2,
-    "error": "ContextLimitError: the request (about 95668 tokens) is over the 29952-token limit"
+    "error": "ContextLimitError: the request (about 42574 tokens) is over the 29952-token limit"
    }
   ]
  }

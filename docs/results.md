@@ -2,7 +2,25 @@
 
 **Offline verification only.** There are no model runs, no provider calls and no performance findings. Nothing here measures task quality, cost or speed with a real model.
 
+## 2026-10-16: the backstop always on, strict ratio learning removed (0.2.0.dev1)
+
+Decision P7 (SPEC 8 and 13.16). Offline only: scripted models, no provider calls.
+
+- **`make check` passes:**
+  - ruff check, and ruff format over src, tests, scripts and examples;
+  - pyright (`-p pyproject.toml`): 0 errors;
+  - pytest: 60 passed. That is the 57 tests from before P6, plus 3 backstop tests. The 7 strict-learning tests from P6 were removed.
+- **The stored transcripts:** all 32 were re-run. Only `over_budget_ignored` changed, and only in estimate figures derived from the learnt ratio. Its calls, guard decisions, held-back record and ending are the same (P7). It was re-recorded, and `make transcripts-check` then passes for all 32.
+- **The backstop tests,** with default settings:
+  - an edit-like step that grows by 40 characters while the reported input rises by 250 tokens doesn't lower the ratio;
+  - an observation of exactly 0.5 lowers it, and one just below doesn't;
+  - end to end, with a model reporting real usage, a run whose edit-and-read step has that pattern completes, where without the backstop it ends on the context limit.
+- **A check of the tests:** with the threshold patched to 0, the two pattern tests fail: one on its assertion, the other with `ContextLimitError`.
+- **The sources** for the capability and the package's entry point are byte-identical to the version before P6, apart from the version string. The output guard is unchanged.
+
 ## 2026-10-16: strict ratio learning (0.2.0.dev0)
+
+_Superseded by the entry above (P7): the option this entry describes has been removed._
 
 The `strict_ratio_learning` option (decisions P6, SPEC 8 and 13.16), off by default. Offline only: scripted models, no provider calls.
 

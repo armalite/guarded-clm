@@ -49,6 +49,19 @@ Only one implementation exists. There are no compatibility aliases for the preli
 - **The stored transcripts are unchanged:** none of them sets the option, and all 32 pass as recorded (docs/results.md).
 - **If it were the default,** 1 of the 32 would change, by an offline comparison that wrote nothing: `over_budget_ignored`, where the reported input jumps by 40,000 tokens. The backstop ignores that observation, so the run's final `context_limit` record and error estimate about 42,574 tokens instead of 95,668. The calls and the ending are the same. Making the option the default needs a new decision and new transcripts.
 - **Version:** the distribution version and `guarded_clm.__version__` are both `0.2.0.dev0`, which closes O15.
+- **Superseded by P7:** the option is removed, and its backstop is always on.
+
+**P7 (2026-10-16). The backstop is always on; strict ratio learning is removed; version 0.2.0.dev1.** Supersedes P6.
+- **The rule:** the shared estimator ignores any new-text observation below 0.5 characters per token (`MIN_PLAUSIBLE_NEW_TEXT_CHARS_PER_TOKEN`), so it never lowers the new-text ratio (SPEC 8 and 13.16). Everything else in the learning rule is as before P6: the size-based appended test, `MIN_NEW_TEXT_TOKENS`, keeping the lowest, and the starting ratio of 2.5.
+- **Removed:** `strict_ratio_learning` on `ClmContext` and `clm_context()`, with its code paths, docs and tests. There is no deprecated alias. The output guard is unchanged.
+- **Why:** strict ratio learning changed behaviour well beyond the case it was meant to fix. It also stopped the ratio learning from ordinary steps that grew after an edit at plausible ratios, and from the first call of each later turn, so estimates, notices and guard decisions would change in sessions that never had the defect. The backstop alone fixes that case, with the same figures as strict learning there, and leaves every other plausible observation as it was.
+- **The stored transcripts:** all 32 were re-run, and exactly one changed: `over_budget_ignored`. Its script inflates the reported input by 40,000 tokens on purpose, which produces an observation below 0.5 that the backstop now ignores. That transcript was re-recorded, because:
+  - every request and response the model saw is identical;
+  - the guard decides the same (admit, then hold three times), and the held-back record is the same;
+  - the run still ends at the same call, for the same reason: the next request's estimate is over the budget itself (`ContextLimitError`).
+
+  The only differences are estimate figures derived from the learnt ratio. The guard checks' shared base and projection fall by 200 tokens (42,668 to 42,468, and 42,818 to 42,618); the held-back record's shared estimate goes from 109,268 to 42,602; and the final estimate, in the `context_limit` record and the error, goes from 95,668 to 42,574 tokens. The other 31 are unchanged.
+- **Version:** `0.2.0.dev1`, in the distribution metadata and `guarded_clm.__version__`.
 
 ## Library decisions
 

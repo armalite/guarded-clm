@@ -1,7 +1,7 @@
 # guarded-clm
 Model-controlled working context for AI agents, with structured edits, guarded tool outputs and protected conversation history.
 
-**Status:** 0.2.0.dev0, unreleased. `ClmContext` is a [Pydantic AI](https://ai.pydantic.dev/) capability. With it, the agent's model manages its own **working context** within a fixed token budget, and the runtime checks every edit and keeps each request within the limit.
+**Status:** 0.2.0.dev1, unreleased. `ClmContext` is a [Pydantic AI](https://ai.pydantic.dev/) capability. With it, the agent's model manages its own **working context** within a fixed token budget, and the runtime checks every edit and keeps each request within the limit.
 
 **What this repository's verification covers:**
 - **Offline only,** with scripted models;
@@ -76,7 +76,6 @@ uv run python examples/basic_agent.py
 | `limits` | 200 entries, 24,000 characters per entry, 120,000 in total, 256,000 bytes serialized | The working context's limits. |
 | `on_record` | `None` | Called with each trace record (a dict), for logging or tracing. |
 | `id` | `"clm_context"` | The capability id. Pass another if a different capability already uses `clm_context`. |
-| `strict_ratio_learning` | `False` | The size estimator learns new-text density only from steps that extend the last request, and ignores implausible figures. Turn it on with real-usage models whose edits often remove about as much as a step adds; see [SPEC.md](SPEC.md) section 8 and 13.16. |
 
 **How a run can end early:**
 
