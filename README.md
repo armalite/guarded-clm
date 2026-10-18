@@ -13,6 +13,8 @@ Model-controlled working context for AI agents, with structured edits, guarded t
 
 ## How it works
 
+[Visual walkthrough: how guarded-clm works](https://claude.ai/artifact/24Qq2iwUpn7AWotTJfLNNe)
+
 The model doesn't receive a growing message history. Every request is rebuilt from a list of entries: its actions, the tools' outputs, receipts and its own notes. The request has three parts:
 
 - **`<task>`:** the conversation's first request, plus the current one.
