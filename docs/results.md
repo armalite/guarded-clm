@@ -2,6 +2,128 @@
 
 **Offline verification only.** There are no model runs, no provider calls and no performance findings. Nothing here measures task quality, cost or speed with a real model.
 
+## 2026-10-23 (last): runtime notes by provenance in the task-last layout (0.2.0.dev2)
+
+Decision P12 (SPEC 2, 3, 4.2, 10, 13.18 and 13.19). Offline only: scripted models, and the adapter's request bodies over an in-memory transport with a placeholder key. No provider or token-counting calls.
+
+- **What was inspected first:**
+  - Pydantic AI 2.27.1's `UserPromptPart` has no metadata field; `ModelRequest.metadata` (used by P10) is the documented application-only field;
+  - a separate harness's context-management arm classifies notes by the same text prefix, so it had nothing to reuse.
+- **The library's note producer** is `ClmStepLimit`'s finalize notice. With `max_steps=3`, it lands on the user's own prompt request at each run's first call and on tool-result requests after that.
+- **Through the public API, in the task-last layout** (three turns with a scripted model, history passed in memory and as JSON):
+  - later turns opening with `<working_context>`, `<task>` or `[context manager]`, each a pasted fragment followed by a question:
+    - the exact text reaches the next request as the current request, not in the status;
+    - the previous answer is recorded once;
+    - at the next turn the text is exactly one protected `t2.request`;
+  - **the finalize notice** is in the status of all six requests, never in the entries or the task, on both kinds of request. The requests equal the segmented layout's with the task section moved, so the library's notes are handled exactly as the tested prefix rule handles them there;
+  - **notes don't persist:** each turn's history holds one marked rebuilt request and no note metadata;
+  - **host notes:** a host capability's note added with `add_context_note()` is a note in all three layouts. In the task-last layout, an unmarked `[context manager]` part from a host is user text and starts a turn (the documented migration case); in the segmented layout it is still a note;
+  - **`add_context_note()` metadata** survives the JSON round trip, keeps other metadata, and classifies as a note.
+- **The older layouts, unchanged:** a `<task>` opening still loses the turn, and a `[context manager]` opening is still shown once as a note (SPEC 13.19, O17 and O18 there).
+- **Request bodies (Anthropic adapter)**, three turns with the prefixed questions, the finalize notice on and the recommended settings:
+  - the same reusable boundary at every call as the plain run;
+  - every body's status carries the notice;
+  - the pasted `<working_context>` question is one protected `t2.request`;
+  - no body contains any `guarded_clm` metadata key.
+- **Checks of the tests:**
+  - with the `[context manager]` prefix rule put back in the task-last layout, the note-opening turn cases and the host migration test fail;
+  - with `ClmStepLimit` appending its notice unmarked, both finalize-notice tests fail.
+- **The gates:**
+  - `make check` passes: ruff, pyright 0 errors, pytest 92 passed and 1 skipped, with 32 in `test_request_layout.py`;
+  - `make transcripts-check` passes: all 32 are identical, including the step-limit scenario whose notice is now added with `add_context_note()`;
+  - in an environment with `anthropic` 0.125.0, the 17 adapter tests pass.
+
+## 2026-10-23 (later): turn detection by provenance, and the recommended host settings (0.2.0.dev2)
+
+Decisions P10 and P11 (SPEC 3.2, 4.2, 13.18 and 13.19). Offline only, as in the entry below: scripted models, and the adapter's request bodies over an in-memory transport with a placeholder key. No provider or token-counting calls.
+
+- **The defect, shown through the public API** (three turns, a scripted model; the second turn is a pasted `<working_context>` block followed by a question):
+  - **before the fix,** in the task-last layout, the second turn was lost: its request still showed the first question, `t1.answer` was missing, and the question never appeared in any request or as `t2.request`. The same happened for a pasted block that opened with `<task>`;
+  - **after the fix,** the question reaches the second request verbatim as the current request, `t1.answer` is recorded once, and at the third turn the question is the protected `t2.request`, once. This holds with the history passed in memory and after a JSON round trip.
+- **The same check in the older layouts, unchanged:** `"single"` and `"segmented"` handle a `<working_context>` opening correctly, but lose a turn that opens with `<task>`, as their tested rule says (SPEC 13.19, open question O17). In every layout, a turn that opens with `[context manager]` is shown once as a status note and never becomes a turn (O18). Neither was changed.
+- **Checks of the tests:**
+  - with the old prefix rule restored in-test, all four new regression cases fail;
+  - with rebuilt requests never recognised, those four and the not-ingested-again test fail.
+- **Sizes:** the metadata is set after measuring and isn't sent, so in all 32 scenarios the task-last records and runs still equal the segmented ones. The scripted provider sizes the messages it is handed, metadata included, so that comparison sizes them as a provider receives them: without the metadata.
+- **The recommended host settings** (`anthropic_cache_tool_definitions` and `anthropic_cache_instructions`, no `anthropic_cache`), over the three-turn conversation, at TTLs of `5m` and `1h` for the first two with a `5m` cache point:
+  - every body has exactly three breakpoints: the last tool, the system prompt and the last entry, in that order, with a valid TTL order;
+  - no top-level `cache_control` and no marker on the tail;
+  - the reusable boundary at every call is the same as with automatic caching on (the table below);
+  - the rebuilt-request metadata never appears in a body.
+- **Why automatic caching is left out:** with it on, every request's breakpoint is the tail, and all ten tails differ, so the entry it writes there can't be read. In this conversation the tail was 305 to 352 characters (the task section and the status) out of 324 to 3,334 in the user message. Leaving it out avoids writing those characters at the cache-write rate. The size depends on the task text's length.
+- **The gates:** `make check` passes (ruff, pyright 0 errors, pytest 85 passed and 1 skipped: 25 in `test_request_layout.py`); `make transcripts-check` passes with all 32 identical; in an environment with `anthropic` 0.125.0, the 16 adapter tests pass (the full suite: 101 passed).
+- **Not established:** real cache reads, how they compare across the layouts, and the model's task behaviour with the task after the working context. The intended default switch (P11) waits for those.
+
+## 2026-10-23: the task-last segmented layout, for reuse across turns (0.2.0.dev2)
+
+Decision P9 (SPEC 3.2, 4.2, 8, 13.17 and 13.18). Offline only: scripted models, and request bodies from Pydantic AI's Anthropic adapter over an in-memory transport with a placeholder key and no network. No provider calls, including token counting.
+
+- **`make check` passes:** ruff, pyright (0 errors) and pytest, 78 passed and 1 skipped: the 70 from the entry below, plus 8 more in `test_request_layout.py` (18 in all). The skipped module needs `anthropic`, as before.
+- **The adapter checks:** the 13 tests in `test_request_layout_anthropic.py` pass in an environment with `pydantic-ai-slim` 2.27.1 and `anthropic` 0.125.0, with this source installed editable (the full suite there: 91 passed).
+- **`make transcripts-check` passes:** all 32 stored transcripts are identical. None was re-recorded.
+- **All 32 scenarios in the three layouts** (`test_request_layout.py`):
+  - **task-last against segmented:** in every scenario the trace records and the runs are equal, and each rebuilt text is the segmented text with the `<task>` section moved. So the estimates, PRESSURE, held-back notes, endings, holds, refetches and recovery are all the same as the segmented layout's;
+  - **task-last against single:** the same decisions, and the figure differences listed below for the segmented layout (9 to 69 tokens per estimate, median 22);
+  - **a check of the tests:** with `absorb()`'s old detection (the `<task>` opening only), the task-last runs no longer match, so the tests catch a detection regression.
+- **The request bodies over three user turns** (10 calls; turn 1: two lookups and an answer; turn 2: a lookup, an early edit deleting `s1.obs`, an answer; turn 3: two lookups, a late edit deleting the newest observation `s6.obs`, an answer), with the host's automatic, tool and system caching on and a five-minute cache point. Each row is the earlier cache boundary that is an unchanged, eligible prefix of that call's request (an exact block prefix ending at a block an earlier request marked, within the 20-block lookback):
+
+  | Call | Transition | `"segmented_task_last"` | `"segmented"` | `"single"` |
+  | --- | --- | --- | --- | --- |
+  | 1 | an append (first lookup) | `<working_context>` head (call 0's marker) | the task head | tools and system |
+  | 2 | an append | call 1's last entry, `s1.obs` | the same | tools and system |
+  | 3 | **a new turn** | call 2's last entry, `s2.obs` | tools and system (the task block changed) | tools and system |
+  | 4 | an append | call 3's last entry, `t1.answer` | the same | tools and system |
+  | 5 | **an early edit** (`s1.obs` deleted) | the `<working_context>` head only | tools and system | tools and system |
+  | 6 | **a new turn** | call 5's last entry, `s4.rcpt` | tools and system | tools and system |
+  | 7 | an append | call 6's last entry, `t2.request` | the same | tools and system |
+  | 8 | an append | call 7's last entry, `s5.obs` | the same | tools and system |
+  | 9 | **a late edit** (`s6.obs` deleted) | call 7's last entry, `s5.obs` | the same | tools and system |
+
+  - **Across turns:** a new turn appends `t{N}.answer` (and from turn 3 `t{N}.request`) after the entries, so the previous marker is one or two blocks back. In call 6, for example, the request is `<working_context>`, the nine entries from call 5, then `t2.answer` and `t2.request` (marked), then the tail with the task (now with `Current request:` and the third question) and the status.
+  - **After the early edit (call 5):** the unchanged text runs on through `s1.act`, but no earlier request ended its entries there, so no entry can be read there. That is unchanged text with no reusable entry, not an invalidation by the layout.
+  - **After the late edit (call 9):** the deleted `s6.obs` came after call 7's marker, so that boundary survives. Call 8's marker, at `s6.obs`, does not.
+  - **Rejected edits** (a protected id, or an unknown id, in turn 2): nothing is removed and the next request reuses the previous marker.
+  - **The turn records:** `t1.answer`, `t2.request` and `t2.answer` each appear once per request, with `"protected": true`; the first question appears only in the task section, the second only in the task section until turn 3 and then only as `t2.request`; `s1.obs` and `s6.obs` are absent from every request after their deletes.
+  - **Markers:** at most four breakpoints in every body; the context marker on the last entry block (or the head), never on the tail. With caching off, no markers are sent and the layout works the same.
+
+- **Remaining limits:**
+  - **Eligible is not a hit:** whether the provider reads an entry also depends on its lifetime, on the minimum cacheable length (the test prefixes are far shorter than 1,024 tokens) and on how it handles the lookback. Only a live run can show that.
+  - **A step that appends more than 20 blocks** (many parallel calls) passes the lookback, so the previous marker is not found.
+  - **Accepted edits** still invalidate from the first changed entry; an early edit leaves little reusable.
+  - **The host's automatic caching** writes an entry at the end of every request, after the changing tail. With a segmented layout that entry can never be read, so it adds write cost for the tail. Whether to keep it is a host configuration choice.
+  - **The model sees the task after its working context** in this layout. Its effect on behaviour is not measured.
+
+## 2026-10-22: the opt-in segmented request layout (0.2.0.dev2)
+
+Decision P8 (SPEC 3.1, 8 and 13.17). Offline only: scripted models, and request bodies from Pydantic AI's Anthropic adapter over an in-memory transport with a placeholder key. No provider calls, including token counting.
+
+- **`make check` passes:**
+  - ruff check, and ruff format over src, tests, scripts and examples;
+  - pyright (`-p pyproject.toml`): 0 errors;
+  - pytest: 70 passed, 1 skipped. That is the 60 earlier tests unchanged, plus 10 in `test_request_layout.py`. The skipped module, `test_request_layout_anthropic.py`, needs the `anthropic` package, which this library doesn't depend on.
+- **The adapter checks:** the five tests in `test_request_layout_anthropic.py` pass in an environment with the same `pydantic-ai-slim` (2.27.1) and `anthropic` 0.125.0, with this source installed editable.
+- **`make transcripts-check` passes:** all 32 stored transcripts are identical, so the default layout is unchanged. None was re-recorded.
+- **All 32 scenarios in both layouts** (`test_request_layout.py`), run with the segmented layout and a five-minute cache point:
+  - **the same decisions:** in every scenario, the trace record types and statuses, the calls and the endings are the same;
+  - **the same text:** every rebuilt request's text is identical apart from the estimate figures, so retained entries, their order, receipts, protection, held-back notes and recovery are unaffected;
+  - **where the figures differ:** every request's status line. Held-back notes and PRESSURE lines also differ in `dense_guard`, `guard`, `never_fits`, `over_limit_rearm` and `pressure_and_over_limit`, and ending messages in `pressure_and_over_limit` and the two budget scenarios;
+  - **how much:** over 176 calls, the status estimate was 9 to 69 tokens higher (median 22; at most 1.41%, median 0.77%). That is the list content's framing, counted rather than hidden. The scripted provider's own reported usage is derived from the serialized request too, so it rises with it.
+- **The request bodies (Anthropic adapter),** with the host's automatic, tool and system caching on:
+  - every body carries at most four breakpoints;
+  - the context's marker is always on the last entry block (or the task head), never on the changing status block;
+  - with caching off, no markers are sent, and the text is the same as the single layout's apart from the estimate figures.
+- **Reusable boundaries,** by the documented rules (an exact block prefix, breakpoints, a 20-block lookback), over two turns with an accepted edit:
+
+  | Call | Segmented, with the cache point | Single |
+  | --- | --- | --- |
+  | turn 1, after the first lookup | the task head (the first call had no entries) | tools and system |
+  | turn 1, after the second lookup | the whole previous working context | tools and system |
+  | turn 1, after an accepted delete of an early entry | the task head; the entries after it are not reusable | tools and system |
+  | turn 2, a new user turn | tools and system (the task head changed) | tools and system |
+  | turn 2, after a lookup | the whole previous working context | tools and system |
+
+  **What these checks are:** request structure and cache eligibility, not real cache hits, savings or unchanged model behaviour.
+
 ## 2026-10-16: the backstop always on, strict ratio learning removed (0.2.0.dev1)
 
 Decision P7 (SPEC 8 and 13.16). Offline only: scripted models, no provider calls.

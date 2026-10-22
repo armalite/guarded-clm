@@ -6,6 +6,7 @@
 
 **Version history:**
 - **0.1.0.dev0 (2026-10-15):** the first specification of `ClmContext`. It replaces an earlier, unreleased core in this repository, which had a different design (docs/decisions.md, P1).
+- **0.2.0.dev2 (2026-10-22, extended 2026-10-23):** two opt-in segmented request layouts with an optional context cache point. `"segmented"` (section 3.1, decisions P8) keeps the task first, so its cached prefix lasts within a turn. `"segmented_task_last"` (section 3.2, decisions P9) moves the task section after the working context, so the prefix also lasts across user turns; it tells rebuilt requests, runtime notes and user turns apart by runtime-set metadata, never by their text (section 4.2, decisions P10 and P12). `add_context_note()` adds a marked note (section 2). The default layout is unchanged; it is intended to become `"segmented_task_last"` in a later release, after live validation (decisions P11).
 
 ## Contents
 
@@ -50,13 +51,16 @@ agent = Agent(model, capabilities=[clm_context()])
 await agent.run(prompt, conversation_id=cid, message_history=history, usage_limits=UsageLimits(request_limit=CALL_CAP))
 ```
 
-- **`clm_context(*, budget_tokens=32_000, max_steps=60, call_cap=None, end_over_budget=False, max_output_chars=8_000, limits=None, on_record=None, id="clm_context")`** returns a `CombinedCapability` of `ClmStepLimit(max_steps, call_cap=cap)`, then `ClmContext(...)`, in that order. `cap` is `call_cap`, or `2 × max_steps + 24` (144 by default). Pydantic AI flattens a combined capability into its leaves, so this is the same as listing the two.
-- **`ClmContext(*, budget_tokens=32_000, end_over_budget=False, max_output_chars=8_000, max_steps=60, call_cap=144, limits=None, on_record=None, id="clm_context")`:**
+- **`clm_context(*, budget_tokens=32_000, max_steps=60, call_cap=None, end_over_budget=False, max_output_chars=8_000, limits=None, on_record=None, id="clm_context", request_layout="single", cache_point=None)`** returns a `CombinedCapability` of `ClmStepLimit(max_steps, call_cap=cap)`, then `ClmContext(...)`, in that order. `cap` is `call_cap`, or `2 × max_steps + 24` (144 by default). Pydantic AI flattens a combined capability into its leaves, so this is the same as listing the two.
+- **`ClmContext(*, budget_tokens=32_000, end_over_budget=False, max_output_chars=8_000, max_steps=60, call_cap=144, limits=None, on_record=None, id="clm_context", request_layout="single", cache_point=None)`:**
+  - `request_layout` is `"single"` (the default, as tested), `"segmented"` (section 3.1) or `"segmented_task_last"` (section 3.2). Any other value raises `ValueError`.
+  - `cache_point` is `"5m"`, `"1h"` or None (the default). It needs one of the two segmented layouts, or `ValueError` is raised.
   - `max_steps` and `call_cap` are only shown in the runtime status. `ClmStepLimit` enforces them.
   - `max_output_chars` caps the `edit_context` tool's result (section 6.4).
   - `limits` is a `ContextLimits(max_file_bytes=256_000, max_entries=200, max_body_chars=24_000, max_total_chars=120_000)`.
   - `id` is the capability id (L9). Pydantic AI requires ids to be unique within an agent's capabilities, so pass another one when a different capability already uses `clm_context`. `for_run` gives each run's copy the same id, and the edit tool finds that copy by it.
 - **`ClmStepLimit(max_steps=60, *, call_cap=None, finalize=True)`:** section 10.
+- **`add_context_note(request, text) -> UserPromptPart`** (decisions P12): appends `UserPromptPart(text)` to a `ModelRequest`, with the text unchanged, and adds the part's index to `request.metadata["guarded_clm_notes"]`, keeping other metadata. ClmContext shows such a part as a note (section 4.2). `ClmStepLimit` adds its finalize notice with it. A host adds its own notes with it from a capability whose `before_model_request` runs before ClmContext's.
 - **Errors**, all `pydantic_ai.exceptions.AgentRunError`:
   - `ContextLimitError`;
   - `BudgetExceededError`, a subclass of `ContextLimitError`;
@@ -121,7 +125,7 @@ context revision {revision}, {n} entries
 
 - `task_steps` is the steps taken this run minus the edit steps taken this run.
 - The notices are, in this order:
-  - the notes found in the request: user prompt parts starting with `[context manager]`, such as the finalize notice;
+  - the notes found in the request (section 4.2), such as the finalize notice;
   - PRESSURE (section 9);
   - OVER LIMIT (section 9).
 
@@ -137,6 +141,53 @@ context revision {revision}, {n} entries
 
 - **Name:** `edit_context`, with one parameter, `ops: list[dict[str, Any]]`.
 - **Docstring:** exactly as in `capability.py`. It is the tool's description and parameter text.
+
+### 3.1 The segmented layout (opt-in)
+
+With `request_layout="segmented"` (decisions P8), the request is built exactly as above, except that the `UserPromptPart`'s content is a list of items instead of one string:
+
+1. **the task head:** `<task>\n{task}\n</task>\n\n<working_context>\n`;
+2. **one item per entry,** in order: its JSON line, as above, followed by `\n`;
+3. **with `cache_point` set,** a Pydantic AI `CachePoint(ttl=cache_point)`;
+4. **the tail:** `</working_context>\n\n<runtime_status>\n{status}\n</runtime_status>\n`. With no entries it starts with an extra `\n`, as above.
+
+**The joined text items are exactly the single layout's text,** so the sections, entries, markings, escaping and status lines are the same. A provider adapter sends each item as its own content block. The `CachePoint` marks the block before it: the last entry, or the task head when there are no entries. Models without prompt caching drop the marker (Pydantic AI).
+
+**What a provider with prompt caching can reuse** (its documented rules: breakpoints at block boundaries, an exact prefix, a 20-block lookback):
+- **Ordinary steps:** a step appends its entries after the existing ones, so a request's prefix through the previous request's last entry is unchanged, and its cache point is a few blocks further on.
+- **Status changes:** the status comes after the marker, so a status-only change invalidates nothing before it.
+- **Edits:** an accepted edit changes the prefix from the first entry it changes or removes.
+- **New turns:** a new user turn changes the task head (section 5), so it invalidates every block after it.
+
+**What differs from the single layout:**
+- **The request** is not byte-identical: the same characters arrive as several blocks, which a model may treat differently.
+- **The size estimates** (section 8) measure the serialized request, so the list form counts its framing: about three characters per item, plus the marker.
+- **Decisions near a threshold** can therefore differ. The budget, the limit and the rules don't.
+
+### 3.2 The task-last segmented layout (opt-in)
+
+With `request_layout="segmented_task_last"` (decisions P9), the items are those of section 3.1 with the `<task>` section moved, unchanged, after the working context:
+
+1. **the head:** `<working_context>\n`;
+2. **one item per entry,** in order, as in section 3.1;
+3. **with `cache_point` set,** a Pydantic AI `CachePoint(ttl=cache_point)`;
+4. **the tail:** `</working_context>\n` (with no entries, `\n</working_context>\n`), then `\n<task>\n{task}\n</task>\n\n<runtime_status>\n{status}\n</runtime_status>\n`.
+
+**The text is the section 3.1 text with the `<task>` section moved:** the same sections, entries, markings, escaping and status lines, and the same characters and items. Only their order differs.
+
+**Why the order matters:** everything that changes between requests without an edit (the task text at a new turn, and the status) is now in the tail, after the cache point. Before it, there are only the fixed `<working_context>\n` and the entries, which only grow at the end until an edit changes them.
+
+**What a provider with prompt caching can reuse** (the rules in section 3.1):
+- **Ordinary steps and status changes:** as in section 3.1.
+- **New turns:** a new turn appends `t{N}.answer` and, from the second turn, `t{N}.request` after the existing entries (section 5), and changes only the tail's task text. So the previous request's cache point, at its last entry, is still an unchanged prefix, one or two blocks back.
+- **Edits:** as in section 3.1, an accepted edit changes the prefix from the first entry it changes or removes. The prefix up to a later entry can be reused only where an earlier request ended its entries there, within the lookback, and that entry is still alive. After an early edit, often only the first request's `<working_context>\n` head qualifies.
+- **Rejected edits** change nothing, so the next request is append-only.
+
+**What differs from section 3.1:**
+- **The model sees the task after its working context,** not before it. The instructions name the three sections and don't depend on their order, but a model may weigh a request differently by position, so behaviour is not claimed to be the same.
+- **Sizes and decisions are the same:** the same characters and the same number of items serialize to the same length, so every estimate, notice and ending matches section 3.1 (section 13.17).
+- **Turn detection** uses provenance, not text (section 4.2): the rebuilt request carries `ModelRequest.metadata == {"guarded_clm_rebuilt": True}`, set after it is measured, and a runtime note is listed under `metadata["guarded_clm_notes"]` by `add_context_note()` (decisions P10, P12). Pydantic AI keeps that field in the history and doesn't send it to the model.
+- **Host cache settings:** the library adds only the context's `CachePoint` and never changes the model settings. The recommended Anthropic settings are in the README and decisions P11.
 
 ## 4. The working context
 
@@ -164,7 +215,7 @@ context revision {revision}, {n} entries
 
 ### 4.2 Folding a step in
 
-The new messages are those after the last request whose user prompt starts with `<task>\n`. They are taken in order:
+The new messages are those after the last rebuilt request: in the single and segmented layouts, the last request with a user prompt that starts with `<task>\n`; in the task-last layout, the last request whose metadata holds `guarded_clm_rebuilt` (section 3.2, decisions P10). They are taken in order:
 
 - **A response with tool calls:**
   1. `step += 1`.
@@ -174,9 +225,14 @@ The new messages are those after the last request whose user prompt starts with 
   5. `sN.act`, `sN.obs` and `sN.rcpt` (if a receipt is pending) are appended as one revision.
 - **A response without tool calls:** its text becomes `t{turn}.answer`, if non-empty.
 - **A request's user prompt parts:**
-  - a part starting with `[context manager]` is a note, shown in the status;
-  - a part starting with `<task>\n` is skipped;
-  - any other part is a new turn (section 5).
+  - **in the task-last layout** (decisions P12), by provenance only, never by the text:
+    - a part whose index is listed in its request's `metadata["guarded_clm_notes"]` (`add_context_note()`) is a note, shown in the status;
+    - a part of a request with `metadata["guarded_clm_rebuilt"]` is the rebuilt request (it is never among the new messages);
+    - any other part is a new turn (section 5), whatever its text, including openings like `<task>`, `<working_context>` or `[context manager]`;
+  - **in the single and segmented layouts,** by the tested text rules (section 13.19):
+    - a part starting with `[context manager]` is a note, shown in the status;
+    - a part starting with `<task>\n` is skipped;
+    - any other part is a new turn (section 5).
 
 **How results are rendered:**
 
@@ -320,6 +376,8 @@ Request size is estimated per conversation (`SizeEstimator` with a `Calibration`
 - **The overall ratio** moves halfway to `chars / reported`.
 - **The new-text ratio** (from 2.5) keeps the lowest `added chars / added tokens`, for additions of at least 200 tokens, from a request counted as appended (no smaller than the last one). An observation below 0.5 characters per token (`MIN_PLAUSIBLE_NEW_TEXT_CHARS_PER_TOKEN`) is ignored as implausible, so it never lowers the ratio (section 13.16, decisions P7).
 
+**The segmented layouts** (sections 3.1 and 3.2) are measured as sent. Their list content serializes with a few more characters than one string, about three per item plus the marker, so their estimates are slightly higher. The two segmented layouts serialize to the same length.
+
 **This is the shared estimator.** The status line, PRESSURE and the limit checks use it. The guard uses it for its base, and its own r for the added text.
 
 ## 9. Notices and endings
@@ -356,7 +414,7 @@ Request size is estimated per conversation (`SizeEstimator` with a `Calibration`
 
 1. If task steps ≥ `max_steps`, it raises `StepLimitError("the task-step limit of {n} was reached")`.
 2. If calls ≥ `call_cap`, it raises `UsageLimitExceeded("the LM-call cap of {n} was reached")`.
-3. If `left = min(max_steps − steps, call_cap − calls)` is at most 3, and the last message is a request, it appends the user prompt part `[context manager] {left} step(s) left: finish now and give your final answer.` to that request. ClmContext then shows it as a notice.
+3. If `left = min(max_steps − steps, call_cap − calls)` is at most 3, and the last message is a request, it appends the user prompt part `[context manager] {left} step(s) left: finish now and give your final answer.` to that request with `add_context_note()`, which also records it in the request's metadata (section 2). ClmContext then shows it as a notice. The request is the next request's tool results, or the user's own prompt when a run starts with at most 3 steps left.
 
 ClmContext keeps its own step count (the `sN` numbering, over the whole conversation) and its own edit-step count. It shows the per-run difference in the status.
 
@@ -457,6 +515,23 @@ Each of these is the implemented behaviour, kept exactly. Changing any of them i
     - **An example, with synthetic numbers:** a request that grows by 40 characters while the reported input rises by 250 tokens observes 0.16, which is ignored. With a ratio of 2.0 learnt earlier, a later request adding 30,000 characters is estimated at 15,000 tokens more than the last reported input. At 0.16 it would have been 187,500 more.
     - **Not covered:** a step that grew after an edit can still teach a plausible but lower ratio than the new text's true density, because the appended test compares sizes only. Such estimates err high, which is the conservative side.
 
+17. **The segmented layout's figures are slightly higher** (section 3.1, decisions P8).
+    - **The size:** its estimates count the list content's framing. Over the 32 transcript scenarios run in both layouts, each request's estimate was 9 to 69 tokens higher (median 22; at most 1.4%).
+    - **What stayed the same:** in every scenario the trace record types and statuses, the calls and the endings were the same, and every request's text was identical apart from the estimate figures. Those are the status line, PRESSURE lines, held-back notes and ending messages.
+    - **The provider side:** how a provider tokenizes separate blocks is not known offline. Its reported usage calibrates the shared estimator as usual (section 8).
+    - **The task-last layout** (section 3.2, decisions P9) has exactly the same figures and decisions as the segmented layout: in all 32 scenarios its records and runs equal the segmented layout's, and its texts are theirs with the `<task>` section moved.
+
+18. **In the task-last layout, user turns are recognised whatever their text** (decisions P10).
+    - **How:** only a request carrying the runtime's metadata key is a rebuilt request, and only a part listed by `add_context_note()` is a note (decisions P10, P12). A turn that opens with `<working_context>\n`, `<task>\n` or `[context manager]`, such as a pasted example and a question, reaches the next request verbatim as the current request and becomes the protected `t{N}.request` at the next turn. The text is not escaped, stripped or rejected.
+    - **Notes:** the finalize notice stays a note, on the user's own request and on tool-result requests. A note doesn't persist in the history, because the rebuild replaces the request that carried it; where such a request is kept, its metadata survives the JSON round trip.
+    - **Migration:** a host that added notes by starting a user prompt part with `[context manager]` must use `add_context_note()` in this layout. An unmarked part is user text there, so it starts a turn.
+    - **What it needs:** the history passed back must keep `ModelRequest.metadata`, as `result.all_messages()` and its JSON form do. A host that keeps only text, or a conversation that changes layout, isn't supported. A capability between `ClmStepLimit` and ClmContext that reorders a request's parts would invalidate the note indices.
+
+19. **In the single and segmented layouts, text decides a user prompt's origin,** as tested (section 4.2):
+    - **a genuine turn that opens with `<task>\n` is lost:** it is taken for the rebuilt request, so the turn is skipped, the previous answer isn't recorded and the question never reaches the model (open question O17);
+    - **a genuine turn that opens with `[context manager]` is taken for a note:** it is shown once in the status and never becomes a turn (O18);
+    - **unchanged there:** both are kept so that their transcripts stay reproducible. A note added with `add_context_note()` is a note in these layouts too. The task-last layout has neither issue (13.18).
+
 ## 14. The default settings and their assumptions
 
 The defaults are the settings the design was built and tested with:
@@ -498,6 +573,8 @@ Timestamps, run ids, conversation ids, toolset ids and capability ids are left o
 
 - The stored transcripts are never edited by hand, and never re-recorded to make a change pass. An approved behaviour change says how they change (AGENTS.md, "Changing behaviour").
 - A run of the scenarios must be deterministic. Section 13.2 is why no scenario has two edits in one response, except `step_count_drift`. Its two edits are identical and rejected, so their order can't change the transcript.
+
+**The segmented layouts** have no stored transcripts. `tests/test_request_layout.py` runs all 32 scenarios in each layout and compares them (section 13.17), and `tests/test_request_layout_anthropic.py` checks the request bodies from Pydantic AI's Anthropic adapter, over three user turns with early, late and rejected edits. The stored transcripts are all in the default layout, and stay identical.
 
 **The frozen clock:** `run_scenario` runs every scenario inside `frozen_clock()`, which fixes Pydantic AI's clock at 2026-10-15T00:00:00.123456Z and restores it afterwards.
 

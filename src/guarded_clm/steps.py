@@ -7,8 +7,8 @@ It runs in front of `ClmContext`:
 - **Model calls:** every response counts, edit steps included. At `call_cap` calls the next request raises
   `UsageLimitExceeded`.
 - **The finalize notice:** when at most 3 steps or calls are left, the request gets a
-  "[context manager] N step(s) left: finish now and give your final answer." prompt part. ClmContext shows it in
-  the runtime status.
+  "[context manager] N step(s) left: finish now and give your final answer." prompt part, added with
+  `add_context_note()`. ClmContext shows it in the runtime status.
 
 Both counts are per run (one user turn). It must come before `ClmContext` in the capability list, as tested:
 `clm_context()` builds them in that order.
@@ -28,7 +28,25 @@ if TYPE_CHECKING:
 
 EDIT_TOOL = "edit_context"
 NOTE = "[context manager]"
+NOTES_KEY = "guarded_clm_notes"  # `ModelRequest.metadata` key: the indices of the parts that are runtime notes (P12)
 FINALIZE_STEPS = 3
+
+
+def add_context_note(request: ModelRequest, text: str) -> UserPromptPart:
+    """Append a runtime note to a request, for ClmContext to show in the runtime status rather than take as a turn.
+
+    The text is added unchanged as a `UserPromptPart`, and its part index is recorded under
+    `request.metadata["guarded_clm_notes"]` (other metadata is kept). Pydantic AI keeps that metadata with the
+    request and doesn't send it to the model. In the segmented_task_last layout only notes marked this way are notes;
+    the other layouts also take any user prompt part starting with `[context manager]` for one (decisions P12).
+    Call it from a capability's `before_model_request` that runs before ClmContext's.
+    """
+    part = UserPromptPart(text)
+    request.parts = [*request.parts, part]
+    metadata = dict(request.metadata or {})
+    metadata[NOTES_KEY] = [*metadata.get(NOTES_KEY, []), len(request.parts) - 1]
+    request.metadata = metadata
+    return part
 
 
 def lm_call_cap(max_steps: int) -> int:
@@ -64,10 +82,7 @@ class ClmStepLimit(AbstractCapability[Any]):
         left = min(self.max_steps - self.steps, self.call_cap - self.calls)
         final = request_context.messages[-1]
         if self.finalize and left <= FINALIZE_STEPS and isinstance(final, ModelRequest):
-            final.parts = [
-                *final.parts,
-                UserPromptPart(f"{NOTE} {left} step(s) left: finish now and give your final answer."),
-            ]
+            add_context_note(final, f"{NOTE} {left} step(s) left: finish now and give your final answer.")
         return request_context
 
     async def after_model_request(

@@ -63,6 +63,82 @@ Only one implementation exists. There are no compatibility aliases for the preli
   The only differences are estimate figures derived from the learnt ratio. The guard checks' shared base and projection fall by 200 tokens (42,668 to 42,468, and 42,818 to 42,618); the held-back record's shared estimate goes from 109,268 to 42,602; and the final estimate, in the `context_limit` record and the error, goes from 95,668 to 42,574 tokens. The other 31 are unchanged.
 - **Version:** `0.2.0.dev1`, in the distribution metadata and `guarded_clm.__version__`.
 
+**P8 (2026-10-22). An opt-in segmented request layout, with an optional context cache point; version 0.2.0.dev2.**
+- **Why:** the request carries the whole working context in one text block that ends with `<runtime_status>`, and the status changes on every request. Providers cache prompts at content-block boundaries: a cached prefix ends at the end of a block, and a changed block can't be reused, however much of its text is unchanged. So with full-conversation caching on, only the tools and the system prompt can be reused between requests.
+- **The option:** `request_layout` on `ClmContext` and `clm_context()`.
+  - **`"single"` (the default):** the existing layout, unchanged.
+  - **`"segmented"`:** the user prompt part holds the same text as a list of items, which become separate content blocks:
+    - the task head (`<task>…</task>`, then the opening `<working_context>` line);
+    - one item per entry (its JSON line and newline);
+    - the tail (the closing `</working_context>` line and `<runtime_status>`).
+
+    Joined, the items are exactly the single layout's text.
+- **The cache point:** `cache_point` (`"5m"`, `"1h"` or None; the default is None, and it applies to the segmented layout only). It adds a Pydantic AI `CachePoint` after the last entry, or after the task head when there are none: the last block that stays the same while only the status changes.
+  - **Providers without prompt caching** drop the marker (Pydantic AI); the layout works with or without it.
+  - **The library still has no provider-specific code:** `CachePoint` is Pydantic AI's provider-neutral marker.
+- **The cache-boundary strategy:**
+  - **Ordinary steps:** a step appends its entries after the existing ones, so the next request's prefix through the last unchanged entry is identical, and its cache point is two or three blocks after the previous one, within the provider's 20-block lookback.
+  - **Status-only changes** come after the point, so they invalidate nothing before it.
+  - **Edits:** an accepted edit invalidates from the first entry it changes or removes. The prefix before it can be read only when an earlier request's cache point sits at a block before it within the lookback, which is in practice an edit to recent entries.
+  - **New turns:** a new user turn changes the task head (the current request is part of `<task>`), so it invalidates every entry block after it.
+- **Compatibility:**
+  - **The default mode is unchanged,** and all 32 stored transcripts stay identical.
+  - **The segmented mode is a behaviour change, behind the option:**
+    - the model sees the same characters, but as several content blocks, so requests are not byte-identical and responses may differ;
+    - the shared estimator measures the serialized request, so the list form counts a few more characters (about three per item, plus the marker), and estimates, the status line and guard projections are slightly higher;
+    - guard and notice decisions near a threshold can differ for that reason. The budget and the rules are unchanged.
+  - **Unchanged in both modes:** the store, edits, protection, tool order, the guard's rules, the estimator's learning rules, recovery, the step and call limits, the instructions, trace records and the compatibility strings (P2).
+- **Provider notes** (for Anthropic, from its prompt-caching documentation, read 2026-10-22):
+  - **One message breakpoint:** with a host's automatic caching and its tool and system breakpoints, that makes four, the provider's maximum. Pydantic AI drops excess message breakpoints, oldest first.
+  - **TTL order:** a longer TTL must come before a shorter one, so `cache_point` must not be longer than the host's earlier breakpoints.
+  - **Minimum length:** a prefix shorter than the model's minimum is silently not cached.
+- **Version:** `0.2.0.dev2`.
+
+**P9 (2026-10-23). A second opt-in layout with the task after the working context, for reuse across turns; still 0.2.0.dev2.** Resolves O16.
+- **Why:** in the segmented layout (P8) the `<task>` section comes first and holds the current request, so a new user turn changes the first block and invalidates every entry block after it. Only reuse within a turn survives.
+- **The option:** `request_layout="segmented_task_last"`. It is the segmented layout with the same three sections in a different order:
+  1. `<working_context>`, one block per entry;
+  2. the optional `CachePoint` after the last entry;
+  3. the tail, which holds the closing `</working_context>` line, then the whole `<task>` section (unchanged: the first request, and in later turns `Current request:` and the current one), then `<runtime_status>`.
+- **Why this order, and not a split task:** the instructions describe exactly three sections and say the task "is never edited and always present". Moving the section whole keeps its content and needs no new framing. Keeping the first request at the top and only the current request at the end would need either a fourth section the instructions don't describe or a second `<task>`, for a small gain: the first request's tokens would be cacheable instead of re-sent in the tail. That variant is not implemented.
+- **What stays at the front:** only stable text, namely the `<working_context>` opening line and the entry lines. The revision, entry count, step and call counters, size figures, notices, the closing delimiter and the current request are all in the tail, after the cache point.
+- **The turn lifecycle is unchanged:** at a new turn the runtime appends the previous turn's answer (`t{N}.answer`) and, after the first turn, its request (`t{N}.request`) after the existing entries, as before. So the previous request's cache point, at its last entry, is still an unchanged prefix, a block or two before the new one.
+- **Detecting the rebuilt request:** as first written, `absorb()` also took a user prompt starting with `<working_context>` for a rebuilt request in this layout. **Replaced by P10:** that discarded a genuine turn with that opening.
+- **Model-visible difference:** the task and the current request come after the working context instead of before it. The section contents are the same, but the order is not, so the model may behave differently.
+- **Sizes:** the same characters and items as the segmented layout, so the same estimates (P8's framing, counted).
+- **What still invalidates:** an accepted edit, from the first entry it changes, as in P8. Text after that point can be reused only up to an entry where an earlier request's cache point ended, within the provider's 20-block lookback; after an early edit that is often only the first request's `<working_context>` head. A step that appends more than 20 blocks also passes the lookback. No extra breakpoints or cache bookkeeping are added for these cases.
+- **Verified offline** (2026-10-23): the 32 transcripts are unchanged; in all 32 scenarios the task-last records and runs equal the segmented ones, with the `<task>` section moved; and request bodies from Pydantic AI's Anthropic adapter, over three user turns, show the previous marker surviving every append, status change and new turn, as listed in [results.md](results.md). It has not been checked against a live provider.
+- **Kept:** the first segmented layout, `"segmented"`, is kept unchanged, for comparison. Neither is committed or used in a recorded run yet.
+
+**P10 (2026-10-23). In the task-last layout, a rebuilt request is recognised by runtime-set metadata, not by its text; still 0.2.0.dev2.**
+- **The defect (in P9 as first written, never released):** a later user turn that opened with `<working_context>` (for example a pasted example followed by a question) was taken for the rebuilt request. `absorb()` then started after it, so the turn was lost: the previous answer was not recorded, no new turn began, the model never saw the question and it never became `t{N}.request`. A turn opening with `<task>` was lost the same way. Shown through the public API with a scripted model.
+- **The rule now, in this layout only:** `rebuild()` sets `ModelRequest.metadata = {"guarded_clm_rebuilt": True}` on the request it builds. Pydantic AI documents that field as available to the application and not sent to the model; it is kept in `result.all_messages()` and survives the history's JSON round trip. `absorb()` treats a request as rebuilt only when it carries that key, and never looks at the user's text. The caller's content is not changed.
+- **Sizes:** the metadata is set after the request is measured, and the adapter doesn't send it, so estimates are unchanged (still equal to the segmented layout's). The scripted provider in the scenarios sizes the messages it is handed, metadata included, so the equivalence test measures them without it, as a provider receives them.
+- **Not changed:** the single and segmented layouts keep the tested `<task>` prefix rule, so their transcripts stay identical. Their equivalent issue is O17. Notes (`[context manager]`) are unchanged in every layout: O18.
+- **Limits:** a history that loses request metadata (a host that stores only text) is not supported in this layout, nor is changing layout within a conversation.
+
+**P11 (2026-10-23). The intended default for the next release: `segmented_task_last` with a context cache point, after live validation.**
+- **The decision:** the next released version is intended to default to `request_layout="segmented_task_last"` with `cache_point="5m"`. `"single"` and `"segmented"` stay available, set explicitly, for compatibility and experiments, and `cache_point=None` stays the way to send no marker.
+- **Not yet:** this offline checkpoint keeps the current default, `"single"` with no cache point. The switch waits for a bounded live validation that shows real cache reuse within and across turns, and checks task behaviour with the task after the working context. Neither is established yet; the layout guarantees no cache hit.
+- **When it switches:** a minor version bump, a release note, and the stored transcripts re-run under an explicit `request_layout="single"` so they keep testing the old layout unchanged.
+- **Migration for callers, when the default switches:**
+  - to keep today's behaviour exactly, pass `request_layout="single"` (no cache point);
+  - to adopt the new default, pass back the history with its `ModelRequest.metadata` intact (`result.all_messages()` or its JSON form), keep one layout per conversation, and add any host notes with `add_context_note()` instead of a `[context manager]` text prefix (P12);
+  - set the host cache settings recommended below, or turn the marker off with `cache_point=None`.
+- **The recommended host settings** (Pydantic AI's Anthropic settings; the library doesn't set or override them): `anthropic_cache_tool_definitions` and `anthropic_cache_instructions`, and neither `anthropic_cache` nor `anthropic_cache_messages`. Those two put a breakpoint on the last block, which in this layout is the tail, and the tail changes in every request, so the entry written there is never read. That makes three breakpoints (the last tool, the system prompt, the last entry), within the limit of four, and the earlier two may have a longer or equal TTL than the context's marker. Checked offline in the adapter's request bodies (results.md).
+
+**P12 (2026-10-23). Message origin by runtime metadata in the task-last layout: rebuilt requests, runtime notes and user turns; still 0.2.0.dev2.** Resolves O18 for that layout.
+- **Why:** after P10, the task-last layout still classified a user prompt part by text in one case: a part starting with `[context manager]` was a note. So a genuine user turn with that opening was shown once in the status and never became a turn (O18).
+- **What was checked first:** Pydantic AI 2.27.1's `UserPromptPart` has no metadata field; `ModelRequest.metadata` is the documented field "accessed programmatically by the application but is not sent to the LLM", already used by P10. No other public provenance mechanism for user prompt parts exists in that version. A separate harness's context-management arm was also read: it classifies notes by the same text prefix, so it has no mechanism to reuse.
+- **The producers:** the library's only note producer is `ClmStepLimit`'s finalize notice, which appends a user prompt part to the request about to be sent: a tool-result request, or the user's own prompt request when a run starts with three or fewer steps left.
+- **The rule:**
+  - a new public helper, `add_context_note(request, text)`, appends `UserPromptPart(text)` to a `ModelRequest`, unchanged, and records its part index under `ModelRequest.metadata["guarded_clm_notes"]`, keeping any other metadata. `ClmStepLimit` uses it, in every layout;
+  - in the task-last layout, a user prompt part is a rebuilt request if its request carries `guarded_clm_rebuilt` (P10), a note if its index is listed under `guarded_clm_notes`, and otherwise a user turn. Its text is never consulted, so `<task>`, `<working_context>` and `[context manager]` openings are ordinary user text there, neither escaped nor changed.
+- **The older layouts:** their consumption keeps the tested prefix rules (O17, O18 there). The producer change only adds metadata to a request that `ClmContext` replaces with the rebuilt request before the model call, so neither the model nor the scripted provider sees it, and the transcripts stay identical.
+- **Migration:** a host that injected its own note by starting a user prompt part with `[context manager]` must, in the task-last layout, call `add_context_note()` from its own capability before `ClmContext` runs. Otherwise its text is a user turn. No such caller is known; the old layouts still accept the prefix.
+- **Persistence:** notes don't normally reach the history, because the rebuild replaces the request that carried them. Where a request with notes is kept (for example a run that ends before the rebuild), the indices survive the JSON round trip with the request.
+- **Limits:** a capability placed between `ClmStepLimit` and `ClmContext` that reorders a request's parts would invalidate the indices. `clm_context()` keeps the two adjacent.
+
 ## Library decisions
 
 **L1. Exact behaviour is the contract.**
@@ -104,6 +180,10 @@ Each one, if taken up, changes behaviour, so it needs a decision and new transcr
 - **O13. Publishing:** the package name's availability on public indexes is unverified, and no release is authorised.
 - **O14. The copyright line in NOTICE** names an individual. Keep it, or use the project handle? This is the maintainer's choice; the notice is unchanged until then.
 - **O15. Version metadata:** closed by P6. Both versions are `0.2.0.dev0`.
+- **O16 (closed by P9). Reuse across turns in the segmented layout:** a new user turn changes the `<task>` block, because it holds the current request, and that invalidates every entry block after it (P8). Moving the current request after the working context would let unchanged entries be reused across turns, but it changes the request format. Should it be a further option? **Answer:** yes, as a separate opt-in layout that moves the whole `<task>` section (P9); `"segmented"` and the default are unchanged.
+
+- **O17 (open; the task-last layout doesn't have it, P10). A genuine turn that opens with `<task>` is lost in the single and segmented layouts.** Their tested rule takes any user prompt opening with `<task>\n` for the rebuilt request (SPEC 13.19), so such a turn is discarded as described in P10. Fixing it with the P10 metadata would change those layouts' estimates through the scripted provider's sizes, and so the stored transcripts. Should the old layouts get the same rule, with re-recorded transcripts?
+- **O18 (closed by P12 for the task-last layout; open for the single and segmented layouts). A genuine turn that opens with `[context manager]` is shown once as a note:** it appears in the status, never becomes the current request or `t{N}.request`, and is gone from the next request (SPEC 13.19). In the task-last layout, notes are now recognised only by the metadata `add_context_note()` records (P12), so such a turn is an ordinary turn. The single and segmented layouts keep the tested prefix rule; changing it there would change what they record. Should they get the same rule, with re-recorded transcripts, together with O17?
 
 ## Superseded (the preliminary core, 2026-10-15)
 

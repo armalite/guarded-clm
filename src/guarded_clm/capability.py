@@ -7,6 +7,13 @@ identical.
 Every request is rebuilt from the working context: the system prompt, then one user message with `<task>` (the
 first request, plus the current one in later turns), `<working_context>` (the entries, one JSON object per line) and
 `<runtime_status>` (the step, the calls, the size against the limit, and any notices).
+
+The message is one text block by default (`request_layout="single"`). With `request_layout="segmented"` (decisions
+P8) the same text is split into content items: the task head, one item per entry and the status tail, with an
+optional Pydantic AI `CachePoint` after the last entry (`cache_point`), so that a provider can reuse the unchanged
+working context while only the status changes. `request_layout="segmented_task_last"` (decisions P9) does the same
+with the `<task>` section moved, unchanged, after the working context, so that a new user turn changes only the
+tail and the working context stays reusable across turns.
 """
 
 import dataclasses
@@ -14,10 +21,11 @@ import json
 import math
 import re
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.messages import (
+    CachePoint,
     ModelMessage,
     ModelRequest,
     ModelResponse,
@@ -52,7 +60,7 @@ from guarded_clm.estimate import (
     reported_overshoot,
 )
 from guarded_clm.instructions import instructions
-from guarded_clm.steps import EDIT_TOOL, NOTE
+from guarded_clm.steps import EDIT_TOOL, NOTE, NOTES_KEY
 
 if TYPE_CHECKING:
     from pydantic_ai.capabilities import ModelRequestContext
@@ -60,6 +68,8 @@ if TYPE_CHECKING:
 VARIANT = "clm_lite_v3_3"  # the `variant` of every trace record: the tested design's name (a compatibility contract)
 PRESSURE_RATIO = 0.70  # of the budget
 TASK_OPEN = "<task>\n"
+CONTEXT_OPEN = "<working_context>\n"  # how a rebuilt request opens in the segmented_task_last layout (P9)
+REBUILT_KEY = "guarded_clm_rebuilt"  # `ModelRequest.metadata` key on requests rebuilt in that layout (P10)
 R_CAP = 1.5  # characters per token: the guard's highest new-text ratio, and its ratio before any observation
 MARGIN = 1.10
 SHORT_ARGS = 80
@@ -68,21 +78,30 @@ HELD_BACK = (
     "then call it again."
 )
 PROTECTED_ID = re.compile(r"^t\d+\.(request|answer)$")
+RequestLayout = Literal["single", "segmented", "segmented_task_last"]
+REQUEST_LAYOUTS: tuple[RequestLayout, ...] = ("single", "segmented", "segmented_task_last")
+SEGMENTED_LAYOUTS: tuple[RequestLayout, ...] = ("segmented", "segmented_task_last")
+CacheTTL = Literal["5m", "1h"]
 
 
 def is_protected(entry_id: str) -> bool:
     return PROTECTED_ID.match(entry_id) is not None
 
 
-def render_marked(entries: tuple[Entry, ...] | list[Entry]) -> str:
-    """The entries as JSON lines, with `"protected": true` on protected entries and '<' escaped."""
+def marked_lines(entries: tuple[Entry, ...] | list[Entry]) -> list[str]:
+    """One JSON line per entry, with `"protected": true` on protected entries and '<' escaped."""
     lines = []
     for e in entries:
         item: dict[str, Any] = {"id": e.id, "role": e.role, "body": e.body}
         if is_protected(e.id):
             item["protected"] = True
         lines.append(json.dumps(item, ensure_ascii=False).replace("<", "\\u003c"))
-    return "\n".join(lines)
+    return lines
+
+
+def render_marked(entries: tuple[Entry, ...] | list[Entry]) -> str:
+    """The entries as JSON lines, with `"protected": true` on protected entries and '<' escaped."""
+    return "\n".join(marked_lines(entries))
 
 
 def cap(text: str, limit: int) -> str:
@@ -171,6 +190,15 @@ class ClmContext(AbstractCapability[Any]):
         limits: The working context's entry, body and total limits.
         on_record: Called with each trace record (a dict), for example to write JSONL or OpenTelemetry events.
         id: The capability id, unique within an agent's capabilities. It isn't sent to the model.
+        request_layout: `"single"` (the default, as tested): the request's text in one block. `"segmented"`: the
+            same text as several content items (the task head, one per entry, the status tail), so a provider can
+            reuse the unchanged working context between calls within a turn (decisions P8).
+            `"segmented_task_last"`: the same items with the `<task>` section moved after the working context, so
+            the working context stays reusable across turns too (decisions P9).
+        cache_point: With a segmented layout, a Pydantic AI `CachePoint` with this TTL (`"5m"` or `"1h"`) after
+            the last entry, or None (the default) for no marker. Models without prompt caching drop it. It must not
+            be longer than the TTL of any cache breakpoint before it, such as a provider's system or tool
+            breakpoints.
     """
 
     def __init__(
@@ -184,7 +212,17 @@ class ClmContext(AbstractCapability[Any]):
         limits: ContextLimits | None = None,
         on_record: Callable[[dict[str, Any]], None] | None = None,
         id: str = "clm_context",
+        request_layout: RequestLayout = "single",
+        cache_point: CacheTTL | None = None,
     ) -> None:
+        if request_layout not in REQUEST_LAYOUTS:
+            raise ValueError(f"request_layout must be one of {REQUEST_LAYOUTS}, not {request_layout!r}")
+        if cache_point is not None and cache_point not in ("5m", "1h"):
+            raise ValueError(f"cache_point must be '5m', '1h' or None, not {cache_point!r}")
+        if cache_point is not None and request_layout not in SEGMENTED_LAYOUTS:
+            raise ValueError("cache_point needs a segmented request_layout")
+        self.request_layout: RequestLayout = request_layout
+        self.cache_point: CacheTTL | None = cache_point
         self.id = id
         self.description = "The model manages its own working context within a token budget."
         self.defer_loading = False
@@ -223,6 +261,8 @@ class ClmContext(AbstractCapability[Any]):
             limits=self.limits,
             on_record=self.on_record,
             id=self.id or "clm_context",  # the same id, so `resolve()` finds this clone
+            request_layout=self.request_layout,
+            cache_point=self.cache_point,
         )
         key = ctx.conversation_id or ctx.run_id or "session"
         clone.sessions, clone.estimators = self.sessions, self.estimators
@@ -348,7 +388,8 @@ class ClmContext(AbstractCapability[Any]):
         start = 0
         for index, message in enumerate(messages):
             if isinstance(message, ModelRequest) and any(
-                isinstance(p, UserPromptPart) and part_text(p).startswith(TASK_OPEN) for p in message.parts
+                isinstance(p, UserPromptPart) and self.origin(message, i, p) == "rebuilt"
+                for i, p in enumerate(message.parts)
             ):
                 start = index + 1
         session, notes = self.session, []
@@ -357,8 +398,8 @@ class ClmContext(AbstractCapability[Any]):
             part_text(p)
             for m in new
             if isinstance(m, ModelRequest)
-            for p in m.parts
-            if isinstance(p, UserPromptPart) and part_text(p).startswith(NOTE)
+            for i, p in enumerate(m.parts)
+            if isinstance(p, UserPromptPart) and self.origin(m, i, p) == "note"
         ]
         for index, message in enumerate(new):
             if isinstance(message, ModelResponse):
@@ -388,14 +429,14 @@ class ClmContext(AbstractCapability[Any]):
                     session.pending_receipt = None
                 session.store.append(entries, "runtime", session.step)
             elif isinstance(message, ModelRequest):
-                for part in message.parts:
+                for i, part in enumerate(message.parts):
                     if not isinstance(part, UserPromptPart):
                         continue
-                    text = part_text(part)
-                    if text.startswith(NOTE):
-                        notes.append(text)
-                    elif not text.startswith(TASK_OPEN):
-                        self.new_turn(text)
+                    origin = self.origin(message, i, part)
+                    if origin == "note":
+                        notes.append(part_text(part))
+                    elif origin == "turn":
+                        self.new_turn(part_text(part))
         return system, notes
 
     def new_turn(self, request: str) -> None:
@@ -492,6 +533,50 @@ class ClmContext(AbstractCapability[Any]):
             f"<runtime_status>\n{status.strip()}\n</runtime_status>\n"
         )
 
+    def render_items(self, entries: tuple[Entry, ...] | list[Entry], status: str) -> list[str | CachePoint]:
+        """The segmented layouts' content items: the head, one item per entry, the optional `CachePoint` after the
+        last entry, and the tail. With `"segmented"` the head holds the task and the joined text items are exactly
+        `render_with(entries, status)`. With `"segmented_task_last"` the head is the `<working_context>` opening
+        line and the tail holds the closing line, the whole `<task>` section and the status: the same characters,
+        with the task section after the working context (P9)."""
+        lines = marked_lines(entries)
+        task = f"{TASK_OPEN}{self.task_text().strip()}\n</task>\n\n"
+        close = "</working_context>\n" if lines else "\n</working_context>\n"  # as `render_with` with no entries
+        state = f"<runtime_status>\n{status.strip()}\n</runtime_status>\n"
+        if self.request_layout == "segmented_task_last":  # P9: the task after the working context
+            head, tail = CONTEXT_OPEN, f"{close}\n{task}{state}"
+        else:
+            head, tail = f"{task}{CONTEXT_OPEN}", f"{close}\n{state}"
+        items: list[str | CachePoint] = [head, *(f"{line}\n" for line in lines)]
+        if self.cache_point is not None:
+            items.append(CachePoint(ttl=self.cache_point))
+        items.append(tail)
+        return items
+
+    def origin(self, message: ModelRequest, index: int, part: UserPromptPart) -> Literal["rebuilt", "note", "turn"]:
+        """Where a user prompt part came from: a request this capability rebuilt, a runtime note, or the user.
+
+        In the segmented_task_last layout this is provenance only, never the text (decisions P10, P12): the metadata
+        `rebuild()` sets on its request, or the part's index listed by `add_context_note()`. Pydantic AI keeps both
+        in the history and doesn't send them to the model. The other layouts keep the tested text rules: a
+        `[context manager]` opening is a note, a `<task>` opening is the rebuilt request."""
+        if self.request_layout == "segmented_task_last":
+            metadata = message.metadata or {}
+            if metadata.get(REBUILT_KEY):
+                return "rebuilt"
+            return "note" if index in (metadata.get(NOTES_KEY) or ()) else "turn"
+        text = part_text(part)
+        if text.startswith(NOTE):
+            return "note"
+        return "rebuilt" if text.startswith(TASK_OPEN) else "turn"
+
+    def prompt_part(self, entries: tuple[Entry, ...] | list[Entry], status: str) -> UserPromptPart:
+        """The request's user prompt part in the configured layout. Sizes are measured on this part, so the
+        estimates count exactly what is sent."""
+        if self.request_layout in SEGMENTED_LAYOUTS:
+            return UserPromptPart(self.render_items(entries, status))
+        return UserPromptPart(self.render_with(entries, status))
+
     def status(self, tokens: int, notices: list[str]) -> str:
         session = self.session
         task_steps = (session.step - session.run_steps) - (session.edit_steps - session.run_edit_steps)
@@ -520,9 +605,7 @@ class ClmContext(AbstractCapability[Any]):
         parts: list[Any] = [system] if system is not None else []
 
         def tokens(status: str) -> int:
-            request: list[ModelMessage] = [
-                ModelRequest(parts=[*parts, UserPromptPart(self.render_with(entries, status))])
-            ]
+            request: list[ModelMessage] = [ModelRequest(parts=[*parts, self.prompt_part(entries, status)])]
             return self.estimator.measure(ctx.model, request, params)[1]
 
         estimate = tokens(self.status(0, notes))
@@ -535,7 +618,7 @@ class ClmContext(AbstractCapability[Any]):
         assert self.request_ctx is not None
         ctx, params = self.request_ctx
         parts: list[Any] = [system] if system is not None else []
-        request: list[ModelMessage] = [ModelRequest(parts=[*parts, UserPromptPart(self.render_with(entries, status))])]
+        request: list[ModelMessage] = [ModelRequest(parts=[*parts, self.prompt_part(entries, status)])]
         return self.estimator.measure(ctx.model, request, params)[0]
 
     def measure_entries(self, entries: list[Entry], system: SystemPromptPart | None, notes: list[str]) -> int:
@@ -595,12 +678,13 @@ class ClmContext(AbstractCapability[Any]):
 
         def build(notices: list[str]) -> tuple[list[ModelMessage], int, int, bool]:
             parts: list[Any] = [system] if system is not None else []
+            entries = self.session.store.entries
             draft: list[ModelMessage] = [
-                ModelRequest(parts=[*parts, UserPromptPart(self.render(self.status(0, notices)))])
+                ModelRequest(parts=[*parts, self.prompt_part(entries, self.status(0, notices))])
             ]
             _, estimate, _ = self.estimator.measure(ctx.model, draft, params)
             request: list[ModelMessage] = [
-                ModelRequest(parts=[*parts, UserPromptPart(self.render(self.status(estimate, notices)))])
+                ModelRequest(parts=[*parts, self.prompt_part(entries, self.status(estimate, notices))])
             ]
             chars, tokens, appended = self.estimator.measure(ctx.model, request, params)
             return request, chars, tokens, appended
@@ -633,6 +717,10 @@ class ClmContext(AbstractCapability[Any]):
             session.over_limit = False
         if notices != notes:
             request, chars, tokens, appended = build(notices)
+        if self.request_layout == "segmented_task_last":
+            # Mark it as rebuilt (P10), after measuring: the metadata is never sent, so the sizes don't count it.
+            request = [dataclasses.replace(m, metadata={REBUILT_KEY: True}) if isinstance(m, ModelRequest) else m
+                       for m in request]  # fmt: skip
         request_context.messages = request
         self.estimator.begin(chars, appended)
 
