@@ -82,7 +82,7 @@ RequestLayout = Literal["single", "segmented", "segmented_task_last"]
 REQUEST_LAYOUTS: tuple[RequestLayout, ...] = ("single", "segmented", "segmented_task_last")
 SEGMENTED_LAYOUTS: tuple[RequestLayout, ...] = ("segmented", "segmented_task_last")
 CacheTTL = Literal["5m", "1h"]
-DEFAULT_REQUEST_LAYOUT: RequestLayout = "segmented_task_last"  # the default since 0.3.0.dev0 (decisions P13)
+DEFAULT_REQUEST_LAYOUT: RequestLayout = "segmented_task_last"  # the default since 0.3.0 (decisions P13)
 DEFAULT_CACHE_POINT: CacheTTL = "5m"  # what an omitted cache_point resolves to with segmented_task_last
 
 
@@ -210,7 +210,7 @@ class ClmContext(AbstractCapability[Any]):
         limits: The working context's entry, body and total limits.
         on_record: Called with each trace record (a dict), for example to write JSONL or OpenTelemetry events.
         id: The capability id, unique within an agent's capabilities. It isn't sent to the model.
-        request_layout: `"segmented_task_last"` (the default since 0.3.0.dev0, decisions P13): one content item
+        request_layout: `"segmented_task_last"` (the default since 0.3.0, decisions P13): one content item
             per working-context entry, then the `<task>` section and the status, so a provider can reuse the unchanged
             working context within and across turns (decisions P9). `"single"`: the original layout, the request's
             text in one block, as the stored transcripts test it. `"segmented"`: the same text as `"single"` in

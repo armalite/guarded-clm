@@ -35,7 +35,7 @@ def factory_for(package: str, scenarios: Any) -> Any:
     lib = importlib.import_module(package)
 
     # The transcripts test the original single layout. Implementations with request layouts (0.2.0.dev2 and later)
-    # select it explicitly, since 0.3.0.dev0 defaults to another (decisions P13); older ones only have it.
+    # select it explicitly, since 0.3.0 defaults to another (decisions P13); older ones only have it.
     legacy = (
         {"request_layout": "single", "cache_point": None}
         if "request_layout" in inspect.signature(lib.clm_context).parameters

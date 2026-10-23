@@ -20,7 +20,7 @@ This file links to those documents rather than repeating them.
 | 4 | A second opt-in layout, the task after the working context, for reuse across turns (decisions P9) | **done offline** (2026-10-23); not checked live |
 | 5 | Provenance-based turn detection in the task-last layout, and the recommended host cache settings (decisions P10, P11) | **done offline** (2026-10-23) |
 | 5b | Message origin by runtime metadata for notes too, in the task-last layout (decisions P12) | **done offline** (2026-10-23) |
-| 6 | Make `segmented_task_last` with a cache point the default (decisions P11, P13) | **done** (2026-10-23), 0.3.0.dev0; not released |
+| 6 | Make `segmented_task_last` with a cache point the default (decisions P11, P13) | **done** (2026-10-23), 0.3.0.dev0; release 0.3.0 prepared (2026-10-24, decisions P14) |
 
 ## 1. The `ClmContext` implementation, replacing the preliminary core
 

@@ -1,6 +1,6 @@
 [project]
 name = "guarded-clm"
-version = "0.3.0.dev0"
+version = "0.3.0"
 description = "ClmContext: a Pydantic AI capability that lets the model manage its own working context within a token budget, with structured edits, guarded tool outputs and protected conversation history."
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
@@ -21,6 +21,7 @@ classifiers = [
 
 [project.urls]
 Repository = "https://github.com/armalite/guarded-clm"
+Changelog = "https://github.com/armalite/guarded-clm/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [
@@ -37,7 +38,7 @@ build-backend = "hatchling.build"
 packages = ["src/guarded_clm"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/guarded_clm", "README.md", "LICENSE", "NOTICE"]
+include = ["src/guarded_clm", "README.md", "CHANGELOG.md", "LICENSE", "NOTICE"]
 
 [tool.pyright]
 venvPath = "."

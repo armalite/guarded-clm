@@ -8,6 +8,7 @@
 - **0.1.0.dev0 (2026-10-15):** the first specification of `ClmContext`. It replaces an earlier, unreleased core in this repository, which had a different design (docs/decisions.md, P1).
 - **0.2.0.dev2 (2026-10-22, extended 2026-10-23):** two opt-in segmented request layouts with an optional context cache point. `"segmented"` (section 3.1, decisions P8) keeps the task first, so its cached prefix lasts within a turn. `"segmented_task_last"` (section 3.2, decisions P9) moves the task section after the working context, so the prefix also lasts across user turns; it tells rebuilt requests, runtime notes and user turns apart by runtime-set metadata, never by their text (section 4.2, decisions P10 and P12). `add_context_note()` adds a marked note (section 2). The default layout is unchanged; it is intended to become `"segmented_task_last"` in a later release, after live validation (decisions P11).
 - **0.3.0.dev0 (2026-10-23):** the default request layout is now `"segmented_task_last"` with a five-minute context cache point (decisions P13). An omitted `cache_point` resolves to `"5m"` for that layout and to no marker for the others; `request_layout="single"` keeps the original layout, which the stored transcripts test (section 15). Nothing else changed.
+- **0.3.0 (2026-10-24):** the release of 0.3.0.dev0, with no behaviour change. Release notes: [CHANGELOG.md](CHANGELOG.md).
 
 ## Contents
 
@@ -54,7 +55,7 @@ await agent.run(prompt, conversation_id=cid, message_history=history, usage_limi
 
 - **`clm_context(*, budget_tokens=32_000, max_steps=60, call_cap=None, end_over_budget=False, max_output_chars=8_000, limits=None, on_record=None, id="clm_context", request_layout="segmented_task_last", cache_point=DEFAULT)`** returns a `CombinedCapability` of `ClmStepLimit(max_steps, call_cap=cap)`, then `ClmContext(...)`, in that order. `cap` is `call_cap`, or `2 × max_steps + 24` (144 by default). Pydantic AI flattens a combined capability into its leaves, so this is the same as listing the two.
 - **`ClmContext(*, budget_tokens=32_000, end_over_budget=False, max_output_chars=8_000, max_steps=60, call_cap=144, limits=None, on_record=None, id="clm_context", request_layout="segmented_task_last", cache_point=DEFAULT)`:**
-  - `request_layout` is `"segmented_task_last"` (the default since 0.3.0.dev0, section 3.2), `"single"` (the original layout, section 3, as the stored transcripts test it) or `"segmented"` (section 3.1). Any other value raises `ValueError`.
+  - `request_layout` is `"segmented_task_last"` (the default since 0.3.0, section 3.2), `"single"` (the original layout, section 3, as the stored transcripts test it) or `"segmented"` (section 3.1). Any other value raises `ValueError`.
   - `cache_point` is `"5m"`, `"1h"` or None (no marker), and needs a segmented layout unless it is None, or `ValueError` is raised. **When it is omitted** (`DEFAULT`), it resolves to `"5m"` if the layout is `"segmented_task_last"`, and to None otherwise. An explicit value, None included, is used as given. The resolved values are what `request_layout` and `cache_point` hold, and what `for_run` copies.
   - `clm_context()` resolves both in the same way.
   - `max_steps` and `call_cap` are only shown in the runtime status. `ClmStepLimit` enforces them.
@@ -91,7 +92,7 @@ The transcript comparison ignores them. The step limit's and the toolset's ids a
 
 ## 3. The request
 
-**The layouts:** this section describes the request's content in the original `"single"` layout, one text block. Sections 3.1 and 3.2 describe the segmented layouts as transformations of it. **The default is section 3.2's `"segmented_task_last"`** with a five-minute cache point (since 0.3.0.dev0, decisions P13).
+**The layouts:** this section describes the request's content in the original `"single"` layout, one text block. Sections 3.1 and 3.2 describe the segmented layouts as transformations of it. **The default is section 3.2's `"segmented_task_last"`** with a five-minute cache point (since 0.3.0, decisions P13).
 
 **`before_model_request`** folds everything since the last rebuilt request into the context (section 4.2). It then replaces the request with exactly one `ModelRequest`, whose parts are:
 
@@ -578,7 +579,7 @@ Timestamps, run ids, conversation ids, toolset ids and capability ids are left o
 - The stored transcripts are never edited by hand, and never re-recorded to make a change pass. An approved behaviour change says how they change (AGENTS.md, "Changing behaviour").
 - A run of the scenarios must be deterministic. Section 13.2 is why no scenario has two edits in one response, except `step_count_drift`. Its two edits are identical and rejected, so their order can't change the transcript.
 
-**The segmented layouts** have no stored transcripts. `tests/test_request_layout.py` runs all 32 scenarios in each layout and compares them (section 13.17), and `tests/test_request_layout_anthropic.py` checks the request bodies from Pydantic AI's Anthropic adapter, over three user turns with early, late and rejected edits. The stored transcripts are all in the original `"single"` layout: since 0.3.0.dev0 `tests/test_golden.py` and `scripts/record_transcripts.py` select it explicitly (`request_layout="single"`, no cache point; the script does so only for implementations that have the option), and the expected files are unchanged. `test_request_layout.py` also checks that omitting the options runs all 32 scenarios exactly as the explicit new defaults do.
+**The segmented layouts** have no stored transcripts. `tests/test_request_layout.py` runs all 32 scenarios in each layout and compares them (section 13.17), and `tests/test_request_layout_anthropic.py` checks the request bodies from Pydantic AI's Anthropic adapter, over three user turns with early, late and rejected edits. The stored transcripts are all in the original `"single"` layout: since 0.3.0 `tests/test_golden.py` and `scripts/record_transcripts.py` select it explicitly (`request_layout="single"`, no cache point; the script does so only for implementations that have the option), and the expected files are unchanged. `test_request_layout.py` also checks that omitting the options runs all 32 scenarios exactly as the explicit new defaults do.
 
 **The frozen clock:** `run_scenario` runs every scenario inside `frozen_clock()`, which fixes Pydantic AI's clock at 2026-10-15T00:00:00.123456Z and restores it afterwards.
 

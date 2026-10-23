@@ -92,7 +92,7 @@ uv run python examples/basic_agent.py
 
 ### Prompt caching
 
-**By default (since 0.3.0.dev0)** the request is sent as separate content blocks: the working-context entries first, a five-minute Pydantic AI `CachePoint` after the last one, then the task and the status. A provider with prompt caching can reuse the unchanged working context on every ordinary call and when a new user turn starts: a new turn adds the previous answer and question as entries and changes only the text after the marker.
+**By default (since 0.3.0)** the request is sent as separate content blocks: the working-context entries first, a five-minute Pydantic AI `CachePoint` after the last one, then the task and the status. A provider with prompt caching can reuse the unchanged working context on every ordinary call and when a new user turn starts: a new turn adds the previous answer and question as entries and changes only the text after the marker.
 
 | | `"segmented_task_last"` (default) | `"segmented"` | `"single"` (original) |
 |---|---|---|---|
@@ -162,6 +162,7 @@ The full list is in [SPEC.md, sections 13 and 14](SPEC.md#13-known-properties-an
 - [docs/decisions.md](docs/decisions.md): decisions and open questions.
 - [docs/results.md](docs/results.md): offline verification and its limits.
 - [docs/implementation-plan.md](docs/implementation-plan.md): the roadmap.
+- [CHANGELOG.md](CHANGELOG.md): release notes.
 
 ## Develop
 

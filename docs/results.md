@@ -2,6 +2,14 @@
 
 **Offline verification only.** There are no model runs, no provider calls and no performance findings. Nothing here measures task quality, cost or speed with a real model.
 
+## 2026-10-24: release 0.3.0
+
+Decision P14. A version-only change from 0.3.0.dev0: the distribution and module versions are `0.3.0`, the lockfile's own entry follows, and the release notes are in [CHANGELOG.md](../CHANGELOG.md). No source behaviour changed.
+- `make check` passes: ruff, pyright 0 errors, pytest 94 passed and 1 skipped.
+- `make transcripts-check` passes: all 32 stored transcripts are identical.
+- The 21 adapter tests (115 in the full suite) pass with `anthropic` 0.125.0.
+- `uv build` gives `guarded_clm-0.3.0` wheel and sdist. The wheel's metadata says `Version: 0.3.0` and includes LICENSE and NOTICE; the sdist includes CHANGELOG.md; `guarded_clm.__version__` is `0.3.0`.
+
 ## 2026-10-23: the cache-friendly layout becomes the default (0.3.0.dev0)
 
 Decision P13 (SPEC 2, 3, 3.2 and 15; implements P11). Offline only: scripted models, and request bodies from Pydantic AI's Anthropic adapter over an in-memory transport. No provider or token-counting calls. (The live checks that led to the decision were run by a downstream harness and are recorded in its results repository.)

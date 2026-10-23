@@ -156,6 +156,11 @@ Only one implementation exists. There are no compatibility aliases for the preli
   - **with the new default:** keep one layout per conversation, pass back the history with its `ModelRequest.metadata` intact, and add host notes with `add_context_note()` (P12).
 - **Version:** `0.3.0.dev0`, a minor bump for the changed default, in the distribution metadata and `guarded_clm.__version__`. No tag or release.
 
+**P14 (2026-10-24). Release 0.3.0.**
+- **What:** the version becomes `0.3.0` in the distribution metadata and `guarded_clm.__version__`, with the behaviour of 0.3.0.dev0 (P13) unchanged. The lockfile's own entry is refreshed; no dependency moves.
+- **Release notes:** [CHANGELOG.md](../CHANGELOG.md), also included in the sdist and linked from the project URLs. They state the validation scope (offline checks here; live checks on one model and one workload in a downstream harness) and promise neither savings elsewhere nor unchanged model behaviour.
+- **Tagging and publication** are the maintainer's: an annotated `v0.3.0` tag on the release commit. Nothing is uploaded from here (O13 still applies to the package name on public indexes).
+
 ## Library decisions
 
 **L1. Exact behaviour is the contract.**

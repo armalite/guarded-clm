@@ -24,7 +24,7 @@ from guarded_clm.errors import BudgetExceededError, ContextLimitError, StepLimit
 from guarded_clm.estimate import RESERVE_TOKENS
 from guarded_clm.steps import ClmStepLimit, add_context_note, lm_call_cap
 
-__version__ = "0.3.0.dev0"
+__version__ = "0.3.0"
 
 BUDGET_TOKENS = 32_000
 MAX_STEPS = 60
@@ -56,7 +56,7 @@ def clm_context(
         on_record: Called with each trace record.
         id: ClmContext's capability id, if another capability already uses `clm_context`. ClmStepLimit's id is
             `clm_step_limit`.
-        request_layout: `"segmented_task_last"` (the default since 0.3.0.dev0, decisions P13): one content item per
+        request_layout: `"segmented_task_last"` (the default since 0.3.0, decisions P13): one content item per
             working-context entry with the `<task>` section after them, so a provider can reuse the unchanged context
             within and across turns (decisions P9). `"single"`: the original one-block layout, as the stored
             transcripts test it. `"segmented"`: the single layout's text as items, reusable within a turn (P8).
