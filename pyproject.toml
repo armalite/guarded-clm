@@ -1,6 +1,6 @@
 [project]
 name = "guarded-clm"
-version = "0.2.0.dev2"
+version = "0.3.0.dev0"
 description = "ClmContext: a Pydantic AI capability that lets the model manage its own working context within a token budget, with structured edits, guarded tool outputs and protected conversation history."
 readme = "README.md"
 requires-python = ">=3.11,<3.14"

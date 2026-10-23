@@ -1,25 +1,26 @@
-"""The segmented request layouts with a context cache point, offline: two turns, with a scripted model.
+"""The request layouts and the context cache point, offline: two turns, with a scripted model.
 
-    uv run python examples/segmented_layout.py                      # request_layout="segmented_task_last"
-    uv run python examples/segmented_layout.py segmented            # request_layout="segmented"
+    uv run python examples/segmented_layout.py             # clm_context(): the default, segmented_task_last + 5m
+    uv run python examples/segmented_layout.py segmented   # request_layout="segmented" (its marker is opt-in)
+    uv run python examples/segmented_layout.py single      # request_layout="single": the original one-block layout
 
-Both layouts send each rebuilt request as several content items: one per working-context entry, plus fixed text
-around them. `cache_point="5m"` puts a Pydantic AI `CachePoint` after the last entry, so a provider with prompt
-caching can reuse the unchanged working context while only what follows it changes.
+By default (decisions P13) each rebuilt request is a list of content items: the `<working_context>` opening, one item
+per entry, a five-minute Pydantic AI `CachePoint`, then the `<task>` section and the status. A provider with prompt
+caching can reuse the unchanged working context within a turn and across turns; only what follows the marker
+changes. A new turn appends the previous answer as an entry. The model sees the task after its working context.
 
-- `"segmented"` (decisions P8) keeps the `<task>` section first. A new user turn changes it, so the cached context
-  is reused only within a turn.
-- `"segmented_task_last"` (decisions P9) moves the `<task>` section after the working context. A new turn appends
-  the previous answer as an entry and changes only the text after the marker, so the context is reused across
-  turns too. The model sees the task after its working context.
+- `"segmented"` (decisions P8) keeps the `<task>` section first, so a new turn changes it and the cached context is
+  reused only within a turn. Pass `cache_point="5m"` for its marker.
+- `"single"` sends the whole request as one text block, as the stored transcripts test it; nothing after the tools
+  and system prompt can be reused.
+- `cache_point=None` keeps a segmented layout but sends no marker.
 
 No provider is called here; the script prints each request's items and where the cache point sits.
 
-With a real Anthropic model and the task-last layout, the recommended host model settings are
-`anthropic_cache_tool_definitions` and `anthropic_cache_instructions` (for example both `"5m"`), without
-`anthropic_cache` or `anthropic_cache_messages`: those mark the last block, the status tail, which changes on every
-request (decisions P11). With the cache point that makes three breakpoints. The cache point's TTL must not be longer
-than those before it.
+With a real Anthropic model, the recommended host model settings are `anthropic_cache_tool_definitions` and
+`anthropic_cache_instructions` (for example both `"5m"`), without `anthropic_cache` or `anthropic_cache_messages`:
+those mark the last block, the status tail, which changes on every request (decisions P11). With the library's
+marker that makes three breakpoints. The marker's TTL must not be longer than those before it.
 """
 
 import asyncio
@@ -41,7 +42,7 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from guarded_clm import CALL_CAP, clm_context
 
-Layout = Literal["segmented", "segmented_task_last"]
+Layout = Literal["single", "segmented", "segmented_task_last"]
 
 
 def service_status(service: str) -> str:
@@ -81,12 +82,12 @@ def scripted_model() -> FunctionModel:
     return FunctionModel(respond)
 
 
-async def main(layout: Layout) -> None:
+async def main(layout: Layout | None) -> None:
     agent = Agent(
         scripted_model(),
         system_prompt="You are an on-call assistant. Use the tools to answer.",
         tools=[service_status],
-        capabilities=[clm_context(request_layout=layout, cache_point="5m")],
+        capabilities=[clm_context() if layout is None else clm_context(request_layout=layout)],
     )
     history: list[ModelMessage] | None = None
     for prompt in ("Which services are degraded?", "Is search-api affected as well?"):
@@ -102,7 +103,7 @@ async def main(layout: Layout) -> None:
 
 
 if __name__ == "__main__":
-    chosen = sys.argv[1] if len(sys.argv) > 1 else "segmented_task_last"
-    if chosen not in ("segmented", "segmented_task_last"):
-        sys.exit("usage: segmented_layout.py [segmented|segmented_task_last]")
-    asyncio.run(main(cast(Layout, chosen)))
+    chosen = sys.argv[1] if len(sys.argv) > 1 else None
+    if chosen not in (None, "single", "segmented", "segmented_task_last"):
+        sys.exit("usage: segmented_layout.py [single|segmented|segmented_task_last]")
+    asyncio.run(main(cast(Layout | None, chosen)))

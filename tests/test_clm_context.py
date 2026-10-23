@@ -27,6 +27,7 @@ from guarded_clm import (
 from guarded_clm.capability import cap, is_protected, receipt, render_marked, short_args
 from guarded_clm.context import ContextStore, ContextValidationError, EditOutcome, Entry, parse_candidate, serialize
 from guarded_clm.estimate import (
+    part_text,
     MIN_PLAUSIBLE_NEW_TEXT_CHARS_PER_TOKEN,
     Calibration,
     ConversationStore,
@@ -64,7 +65,7 @@ def text(content: str) -> ModelResponse:
 def user_text(messages: list[ModelMessage]) -> str:
     [request] = messages
     assert isinstance(request, ModelRequest)
-    return next(str(p.content) for p in request.parts if isinstance(p, UserPromptPart))
+    return next(part_text(p) for p in request.parts if isinstance(p, UserPromptPart))  # the text, in either layout
 
 
 def entries(rendered: str) -> list[dict[str, Any]]:
@@ -105,6 +106,7 @@ def test_clm_context_is_the_step_limit_then_the_context_with_the_tested_defaults
     assert (context.max_steps, context.call_cap) == (60, 144) and CALL_CAP == 144
     assert context.limits == ContextLimits()
     assert enforced_limit(32_000) == 29_952
+    assert (context.request_layout, context.cache_point) == ("segmented_task_last", "5m")  # decisions P13
 
 
 class Named(AbstractCapability[Any]):
@@ -155,13 +157,20 @@ def test_the_instructions_are_the_tested_text() -> None:
 # ---------------------------------------------------------------------- the request
 
 
-def test_every_request_is_rebuilt_as_task_working_context_and_status() -> None:
+@pytest.mark.parametrize("layout", ["segmented_task_last", "single"])
+def test_every_request_is_rebuilt_as_task_working_context_and_status(layout: str) -> None:
+    """The default puts the working context first and the task after it; the original single layout puts the task
+    first (SPEC 3 and 3.2)."""
     script = Script([call("note", {}, "c1"), text("done")])
-    run(script, "the task")
+    run(script, "the task", **({"request_layout": "single", "cache_point": None} if layout == "single" else {}))
     second = script.seen[1]
     assert len(second) == 1  # one request: the system prompt and one user message
     rendered = user_text(second)
-    assert rendered.startswith("<task>\nthe task\n</task>\n\n<working_context>\n")
+    if layout == "single":
+        assert rendered.startswith("<task>\nthe task\n</task>\n\n<working_context>\n")
+    else:
+        assert rendered.startswith("<working_context>\n")
+        assert "\n</working_context>\n\n<task>\nthe task\n</task>\n\n<runtime_status>\n" in rendered
     assert [e["id"] for e in entries(rendered)] == ["s1.act", "s1.obs"]
     status = rendered.split("<runtime_status>\n", 1)[1]
     assert status.startswith("step 2; task steps used this turn 1 of 60 (edit_context steps are free); model calls")
@@ -171,7 +180,7 @@ def test_later_turns_keep_the_first_request_in_the_task_and_protect_earlier_turn
     script = Script([text("one"), text("two"), text("three")])
     run(script, "first", "second", "third")
     rendered = user_text(script.seen[2])
-    assert rendered.startswith("<task>\nfirst\n\nCurrent request:\nthird\n</task>")
+    assert "<task>\nfirst\n\nCurrent request:\nthird\n</task>" in rendered
     marked = {e["id"]: e.get("protected") for e in entries(rendered)}
     assert marked == {"t1.answer": True, "t2.answer": True, "t2.request": True}
 

@@ -63,14 +63,32 @@ def test_segmented_items_join_to_exactly_the_single_layout_text(entries: list[En
     assert markers == ([len(items) - 2] if cache_point else [])  # after the last entry, before the status tail
 
 
-def test_the_options_are_validated_and_the_default_is_unchanged() -> None:
-    assert ClmContext().request_layout == "single" and ClmContext().cache_point is None
+def resolved(**options: Any) -> tuple[str, str | None]:
+    context = ClmContext(**options)
+    [built] = [c for c in clm_context(**options).capabilities if isinstance(c, ClmContext)]
+    assert (built.request_layout, built.cache_point) == (context.request_layout, context.cache_point)
+    return context.request_layout, context.cache_point
+
+
+def test_the_defaults_and_how_an_omitted_cache_point_resolves() -> None:
+    """decisions P13: segmented_task_last with a five-minute marker by default; an omitted cache_point is "5m" only
+    for that layout; an explicit one is kept as given, None included."""
+    assert resolved() == ("segmented_task_last", "5m")
+    assert resolved(request_layout="segmented_task_last") == ("segmented_task_last", "5m")
+    assert resolved(cache_point=None) == ("segmented_task_last", None)
+    assert resolved(cache_point="1h") == ("segmented_task_last", "1h")
+    assert resolved(request_layout="single") == ("single", None)  # the original layout, usable as it was
+    assert resolved(request_layout="single", cache_point=None) == ("single", None)
+    assert resolved(request_layout="segmented") == ("segmented", None)  # its marker stays opt-in (P8)
+    assert resolved(request_layout="segmented", cache_point="5m") == ("segmented", "5m")
     with pytest.raises(ValueError, match="request_layout"):
         ClmContext(request_layout="blocks")  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="needs a segmented request_layout"):
-        ClmContext(cache_point="5m")
+        ClmContext(request_layout="single", cache_point="5m")
     with pytest.raises(ValueError, match="cache_point must be"):
         ClmContext(request_layout="segmented", cache_point="10m")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="cache_point must be"):
+        ClmContext(cache_point="10m")  # type: ignore[arg-type]
     single = context_with(ENTRIES, layout="single", cache_point=None)
     assert isinstance(single.prompt_part(single.session.store.entries, "s").content, str)
 
@@ -86,7 +104,10 @@ def joined_dense_chars(messages: Any) -> int:
     return sum(prompt.count(e) * len(e) for e in {json.dumps(d)[1:-1] for d in scenarios.DENSE})
 
 
-def factory(layout: str, cache_point: str | None) -> scenarios.StackFactory:
+def factory(layout: str | None, cache_point: str | None = None) -> scenarios.StackFactory:
+    """The scenarios' stack with these options, or with both omitted (the library's defaults) when layout is None."""
+    options = {} if layout is None else {"request_layout": layout, "cache_point": cache_point}
+
     def make(settings: scenarios.Settings, on_record: Any) -> scenarios.Stack:
         return scenarios.Stack(
             capabilities=[
@@ -103,8 +124,7 @@ def factory(layout: str, cache_point: str | None) -> scenarios.StackFactory:
                         max_total_chars=settings.max_total_chars,
                     ),
                     on_record=on_record,
-                    request_layout=layout,  # type: ignore[arg-type]
-                    cache_point=cache_point,  # type: ignore[arg-type]
+                    **options,
                 )
             ]
         )
@@ -247,18 +267,32 @@ def test_task_last_items_are_the_same_text_with_the_task_section_after_the_conte
     assert texts[-1].startswith(("</working_context>", "\n</working_context>")) and "<runtime_status>" in texts[-1]
 
 
-@pytest.fixture(scope="module")
-def task_last_runs() -> dict[str, dict[str, Any]]:
+def runs_with(layout: str | None, cache_point: str | None = None) -> dict[str, dict[str, Any]]:
     original = scenarios.dense_chars, scenarios.request_chars
     scenarios.dense_chars = joined_dense_chars  # type: ignore[assignment]
     scenarios.request_chars = provider_request_chars  # type: ignore[assignment]
     try:
         return {
-            name: json.loads(json.dumps(run(factory("segmented_task_last", "5m"))))
-            for name, run in scenarios.SCENARIOS.items()
+            name: json.loads(json.dumps(run(factory(layout, cache_point)))) for name, run in scenarios.SCENARIOS.items()
         }
     finally:
         scenarios.dense_chars, scenarios.request_chars = original  # type: ignore[assignment]
+
+
+@pytest.fixture(scope="module")
+def task_last_runs() -> dict[str, dict[str, Any]]:
+    return runs_with("segmented_task_last", "5m")
+
+
+def test_omitted_options_are_the_validated_new_defaults_in_every_scenario(
+    task_last_runs: dict[str, dict[str, Any]],
+) -> None:
+    """All 32 scenarios with request_layout and cache_point omitted run exactly as with segmented_task_last and a
+    five-minute cache point stated: the same records, runs, model inputs and request items (decisions P13)."""
+    omitted = runs_with(None)
+    assert omitted.keys() == task_last_runs.keys()
+    for name in omitted:
+        assert omitted[name] == task_last_runs[name], name
 
 
 def provider_request_chars(messages: Any, info: Any) -> int:
@@ -415,7 +449,8 @@ def converse(
         return next(script)
 
     agent = Agent(FunctionModel(respond), tools=[lookup],
-                  capabilities=[*capabilities, clm_context(request_layout=cast(Any, layout), max_steps=max_steps)])  # fmt: skip
+                  capabilities=[*capabilities, clm_context(request_layout=cast(Any, layout), max_steps=max_steps,
+                                                 cache_point=None if layout == "single" else "5m")])  # fmt: skip
     history: list[ModelMessage] | None = None
     histories = []
     for prompt in ("Which record is broken?", "Which record changed first?", "Anything else?"):

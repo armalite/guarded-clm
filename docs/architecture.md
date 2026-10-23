@@ -24,8 +24,8 @@ tests/
   test_request_layout_anthropic.py  request bodies from Pydantic AI's Anthropic adapter, over one and three user turns
                                     (skipped without `anthropic`)
 scripts/record_transcripts.py   records or checks the transcripts against any implementation (--package)
-examples/basic_agent.py         an offline, runnable usage example
-examples/segmented_layout.py    the segmented layouts and their cache point over two turns, offline
+examples/basic_agent.py         an offline, runnable usage example in the default layout
+examples/segmented_layout.py    the three layouts and the cache point over two turns, offline
 ```
 
 ## How it plugs into Pydantic AI
@@ -52,6 +52,8 @@ agent.run(prompt, conversation_id, message_history)
 ```
 
 ## The request layouts
+
+**The defaults** (decisions P13): `request_layout="segmented_task_last"`, and an omitted `cache_point` (the `DEFAULT` sentinel) resolves to `"5m"` for that layout and to None for the others, in `resolve_cache_point()` at the start of `ClmContext.__init__`. Validation follows on the resolved value, so `"single"` with an explicit marker still raises. `clm_context()` passes both arguments through unresolved; nothing else reads the defaults.
 
 `prompt_part()` builds the request's user prompt part for each layout:
 - **`"single"`:** `render_with()`'s text, one string;

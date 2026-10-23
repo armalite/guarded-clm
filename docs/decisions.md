@@ -117,7 +117,7 @@ Only one implementation exists. There are no compatibility aliases for the preli
 - **Not changed:** the single and segmented layouts keep the tested `<task>` prefix rule, so their transcripts stay identical. Their equivalent issue is O17. Notes (`[context manager]`) are unchanged in every layout: O18.
 - **Limits:** a history that loses request metadata (a host that stores only text) is not supported in this layout, nor is changing layout within a conversation.
 
-**P11 (2026-10-23). The intended default for the next release: `segmented_task_last` with a context cache point, after live validation.**
+**P11 (2026-10-23). The intended default for the next release: `segmented_task_last` with a context cache point, after live validation.** Implemented by P13.
 - **The decision:** the next released version is intended to default to `request_layout="segmented_task_last"` with `cache_point="5m"`. `"single"` and `"segmented"` stay available, set explicitly, for compatibility and experiments, and `cache_point=None` stays the way to send no marker.
 - **Not yet:** this offline checkpoint keeps the current default, `"single"` with no cache point. The switch waits for a bounded live validation that shows real cache reuse within and across turns, and checks task behaviour with the task after the working context. Neither is established yet; the layout guarantees no cache hit.
 - **When it switches:** a minor version bump, a release note, and the stored transcripts re-run under an explicit `request_layout="single"` so they keep testing the old layout unchanged.
@@ -138,6 +138,23 @@ Only one implementation exists. There are no compatibility aliases for the preli
 - **Migration:** a host that injected its own note by starting a user prompt part with `[context manager]` must, in the task-last layout, call `add_context_note()` from its own capability before `ClmContext` runs. Otherwise its text is a user turn. No such caller is known; the old layouts still accept the prefix.
 - **Persistence:** notes don't normally reach the history, because the rebuild replaces the request that carried them. Where a request with notes is kept (for example a run that ends before the rebuild), the indices survive the JSON round trip with the request.
 - **Limits:** a capability placed between `ClmStepLimit` and `ClmContext` that reorders a request's parts would invalidate the indices. `clm_context()` keeps the two adjacent.
+
+**P13 (2026-10-23). The default becomes `segmented_task_last` with a five-minute context cache point; version 0.3.0.dev0.** Implements P11, approved by the maintainer.
+- **Why now:** the conditions P11 set were met. A downstream harness passed the options explicitly with the recommended host settings, and its bounded live checks (one development pair, then six sessions on previously used instances) showed the provider reading the cached working context on every ordinary call and every new-turn start, at the predicted boundaries, with task results no worse than the single layout's. The protocols and figures are in that harness's results repository; they are not repeated here.
+- **The change is the defaults only:**
+  - `request_layout` now defaults to `"segmented_task_last"`;
+  - an omitted `cache_point` resolves to `"5m"` when the resolved layout is `"segmented_task_last"`, and to no marker for `"single"` and `"segmented"`;
+  - an explicit `cache_point` is used as given: `None` sends no marker, and `"5m"` or `"1h"` with `"single"` still raises `ValueError`.
+  - Request ordering, edits, protection, message origin, the guard, the estimator, recovery, limits and cache boundaries are unchanged: the defaults select the already tested layout.
+- **Why `"segmented"` keeps no marker when it is omitted:** its marker was opt-in when it was tested (P8), and existing configurations that select it explicitly keep their behaviour.
+- **This departs from the rule that behaviour changes ship off by default** (AGENTS.md). The maintainer approved the switch, as P11 planned it. The tested single layout stays available and its transcripts unchanged.
+- **The stored transcripts** are now legacy-layout tests: `tests/test_golden.py` and `scripts/record_transcripts.py` select `request_layout="single"` with no cache point explicitly. Their expected files are unchanged.
+- **Model settings stay with the host:** the library still sets nothing in them. The recommended Anthropic settings (P11) are documented, not applied.
+- **Migration:**
+  - **to keep the previous behaviour exactly,** pass `request_layout="single"`;
+  - **to keep the new layout without a marker,** pass `cache_point=None`;
+  - **with the new default:** keep one layout per conversation, pass back the history with its `ModelRequest.metadata` intact, and add host notes with `add_context_note()` (P12).
+- **Version:** `0.3.0.dev0`, a minor bump for the changed default, in the distribution metadata and `guarded_clm.__version__`. No tag or release.
 
 ## Library decisions
 

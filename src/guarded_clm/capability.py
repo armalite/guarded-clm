@@ -8,12 +8,12 @@ Every request is rebuilt from the working context: the system prompt, then one u
 first request, plus the current one in later turns), `<working_context>` (the entries, one JSON object per line) and
 `<runtime_status>` (the step, the calls, the size against the limit, and any notices).
 
-The message is one text block by default (`request_layout="single"`). With `request_layout="segmented"` (decisions
-P8) the same text is split into content items: the task head, one item per entry and the status tail, with an
-optional Pydantic AI `CachePoint` after the last entry (`cache_point`), so that a provider can reuse the unchanged
-working context while only the status changes. `request_layout="segmented_task_last"` (decisions P9) does the same
-with the `<task>` section moved, unchanged, after the working context, so that a new user turn changes only the
-tail and the working context stays reusable across turns.
+By default (`request_layout="segmented_task_last"`, decisions P9 and P13) the message is a list of content items:
+the `<working_context>` opening and one item per entry, a five-minute Pydantic AI `CachePoint` after the last entry
+(`cache_point`), then the `<task>` section and the status. A provider can then reuse the unchanged working context
+within and across user turns; only the tail changes. `request_layout="single"` is the original layout, one text
+block, as the stored transcripts test it. `request_layout="segmented"` (decisions P8) splits that same text into
+items with the task first, so the context is reusable within a turn only.
 """
 
 import dataclasses
@@ -82,6 +82,26 @@ RequestLayout = Literal["single", "segmented", "segmented_task_last"]
 REQUEST_LAYOUTS: tuple[RequestLayout, ...] = ("single", "segmented", "segmented_task_last")
 SEGMENTED_LAYOUTS: tuple[RequestLayout, ...] = ("segmented", "segmented_task_last")
 CacheTTL = Literal["5m", "1h"]
+DEFAULT_REQUEST_LAYOUT: RequestLayout = "segmented_task_last"  # the default since 0.3.0.dev0 (decisions P13)
+DEFAULT_CACHE_POINT: CacheTTL = "5m"  # what an omitted cache_point resolves to with segmented_task_last
+
+
+class DefaultCachePoint:
+    """The value of an omitted `cache_point`: `"5m"` with `segmented_task_last`, otherwise no marker (P13)."""
+
+    def __repr__(self) -> str:
+        return "DEFAULT"
+
+
+DEFAULT = DefaultCachePoint()
+
+
+def resolve_cache_point(request_layout: str, cache_point: CacheTTL | DefaultCachePoint | None) -> CacheTTL | None:
+    """An omitted cache_point becomes "5m" for segmented_task_last and None for the other layouts; an explicit value
+    (None included) is kept as given and validated by the caller."""
+    if isinstance(cache_point, DefaultCachePoint):
+        return DEFAULT_CACHE_POINT if request_layout == "segmented_task_last" else None
+    return cache_point
 
 
 def is_protected(entry_id: str) -> bool:
@@ -190,15 +210,15 @@ class ClmContext(AbstractCapability[Any]):
         limits: The working context's entry, body and total limits.
         on_record: Called with each trace record (a dict), for example to write JSONL or OpenTelemetry events.
         id: The capability id, unique within an agent's capabilities. It isn't sent to the model.
-        request_layout: `"single"` (the default, as tested): the request's text in one block. `"segmented"`: the
-            same text as several content items (the task head, one per entry, the status tail), so a provider can
-            reuse the unchanged working context between calls within a turn (decisions P8).
-            `"segmented_task_last"`: the same items with the `<task>` section moved after the working context, so
-            the working context stays reusable across turns too (decisions P9).
-        cache_point: With a segmented layout, a Pydantic AI `CachePoint` with this TTL (`"5m"` or `"1h"`) after
-            the last entry, or None (the default) for no marker. Models without prompt caching drop it. It must not
-            be longer than the TTL of any cache breakpoint before it, such as a provider's system or tool
-            breakpoints.
+        request_layout: `"segmented_task_last"` (the default since 0.3.0.dev0, decisions P13): one content item
+            per working-context entry, then the `<task>` section and the status, so a provider can reuse the unchanged
+            working context within and across turns (decisions P9). `"single"`: the original layout, the request's
+            text in one block, as the stored transcripts test it. `"segmented"`: the same text as `"single"` in
+            several items (the task head, one per entry, the status tail), reusable within a turn (decisions P8).
+        cache_point: A Pydantic AI `CachePoint` with this TTL (`"5m"` or `"1h"`) after the last entry, or None for no
+            marker. Omitted, it is `"5m"` with `"segmented_task_last"` and no marker with the other layouts; a value
+            other than None needs a segmented layout. Models without prompt caching drop it. It must not be longer
+            than the TTL of any cache breakpoint before it, such as a provider's system or tool breakpoints.
     """
 
     def __init__(
@@ -212,9 +232,10 @@ class ClmContext(AbstractCapability[Any]):
         limits: ContextLimits | None = None,
         on_record: Callable[[dict[str, Any]], None] | None = None,
         id: str = "clm_context",
-        request_layout: RequestLayout = "single",
-        cache_point: CacheTTL | None = None,
+        request_layout: RequestLayout = DEFAULT_REQUEST_LAYOUT,
+        cache_point: CacheTTL | DefaultCachePoint | None = DEFAULT,
     ) -> None:
+        cache_point = resolve_cache_point(request_layout, cache_point)
         if request_layout not in REQUEST_LAYOUTS:
             raise ValueError(f"request_layout must be one of {REQUEST_LAYOUTS}, not {request_layout!r}")
         if cache_point is not None and cache_point not in ("5m", "1h"):

@@ -31,6 +31,8 @@ def library_factory(settings: scenarios.Settings, on_record: Any) -> scenarios.S
             max_total_chars=settings.max_total_chars,
         ),
         on_record=on_record,
+        request_layout="single",  # the stored transcripts test the original layout (decisions P13)
+        cache_point=None,
     )
     return scenarios.Stack(capabilities=[capability])
 

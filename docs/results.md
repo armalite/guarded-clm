@@ -2,6 +2,28 @@
 
 **Offline verification only.** There are no model runs, no provider calls and no performance findings. Nothing here measures task quality, cost or speed with a real model.
 
+## 2026-10-23: the cache-friendly layout becomes the default (0.3.0.dev0)
+
+Decision P13 (SPEC 2, 3, 3.2 and 15; implements P11). Offline only: scripted models, and request bodies from Pydantic AI's Anthropic adapter over an in-memory transport. No provider or token-counting calls. (The live checks that led to the decision were run by a downstream harness and are recorded in its results repository.)
+
+- **The defaults:** `request_layout="segmented_task_last"`; an omitted `cache_point` resolves to `"5m"` for that layout and to no marker for `"single"` and `"segmented"`; an explicit value, None included, is used as given.
+- **Omitted equals explicit:**
+  - in all 32 scenarios, the records, runs, model inputs and request items with both options omitted equal those with `"segmented_task_last"` and `"5m"` stated;
+  - through the Anthropic adapter, three turns with early, late and rejected edits send identical request bodies, with the recommended host settings, with automatic caching set by the host, and with caching off.
+- **The host's settings stay its own:** with automatic caching set, the top-level breakpoint is still sent; without tool or instruction caching, those blocks carry no marker.
+- **The other options:**
+  - explicit `"single"` sends the original one-block request, with no marker and no metadata on the wire;
+  - explicit `"segmented"` keeps its opt-in marker;
+  - explicit `cache_point=None` sends no library marker;
+  - a marker with `"single"`, an unknown layout and an unknown TTL raise `ValueError`.
+- **Message origin:** the P10 and P12 tests pass with the layouts stated, and the readable tests now run in the default layout, the finalize notice included.
+- **The stored transcripts:** all 32 pass unchanged with `"single"` selected explicitly in `tests/test_golden.py` and `scripts/record_transcripts.py`. No expected file changed.
+- **The gates:**
+  - `make check` passes: ruff, pyright 0 errors, pytest 94 passed and 1 skipped;
+  - `make transcripts-check` passes;
+  - the 21 adapter tests (115 in the full suite) pass in an environment with `anthropic` 0.125.0;
+  - `uv build` gives 0.3.0.dev0, with LICENSE and NOTICE.
+
 ## 2026-10-23 (last): runtime notes by provenance in the task-last layout (0.2.0.dev2)
 
 Decision P12 (SPEC 2, 3, 4.2, 10, 13.18 and 13.19). Offline only: scripted models, and the adapter's request bodies over an in-memory transport with a placeholder key. No provider or token-counting calls.

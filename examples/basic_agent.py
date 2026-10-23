@@ -5,6 +5,13 @@
 The scripted `FunctionModel` stands in for a real model: it reads a service's status, tidies its working context
 with `edit_context`, answers, and then answers a follow-up. No provider is called. Each trace record's type is
 printed as it arrives, and the last request the model saw is shown at the end.
+
+`clm_context()` uses the default, cache-friendly request layout: the working-context entries first, a five-minute
+prompt-cache marker after them, then the task and the runtime status. With a real Anthropic model, the recommended
+host settings cache the tools and the instructions as well, and add no automatic last-block breakpoint:
+
+    Agent(AnthropicModel("claude-sonnet-5"), capabilities=[clm_context()],
+          model_settings={"anthropic_cache_tool_definitions": "5m", "anthropic_cache_instructions": "5m"})
 """
 
 import asyncio
@@ -12,7 +19,7 @@ from collections.abc import Iterator
 from typing import Any
 
 from pydantic_ai import Agent, UsageLimits
-from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ToolCallPart, UserPromptPart
+from pydantic_ai.messages import CachePoint, ModelMessage, ModelResponse, TextPart, ToolCallPart, UserPromptPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from guarded_clm import CALL_CAP, clm_context
@@ -84,8 +91,10 @@ async def main() -> None:
         history = result.all_messages()
         print(f"agent: {result.output}\n")
     if history:
-        text = next(p.content for p in history[0].parts if isinstance(p, UserPromptPart))
-        print("The last request the model saw:\n" + (text if isinstance(text, str) else str(text)))
+        content = next(p.content for p in history[0].parts if isinstance(p, UserPromptPart))
+        items = [content] if isinstance(content, str) else content
+        shown = "".join(f"[cache point, ttl {x.ttl}]\n" if isinstance(x, CachePoint) else str(x) for x in items)
+        print("The last request the model saw (its content items joined):\n" + shown)
 
 
 if __name__ == "__main__":

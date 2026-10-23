@@ -157,7 +157,7 @@ def test_segmented_bodies_mark_the_last_entry_and_respect_the_breakpoint_limit()
 
 def test_ordinary_appends_and_status_changes_keep_the_working_context_reusable() -> None:
     seg = run_conversation(conversation(), settings=HOST_CACHING, request_layout="segmented", cache_point="5m")
-    single = run_conversation(conversation(), settings=HOST_CACHING)
+    single = run_conversation(conversation(), settings=HOST_CACHING, request_layout="single")
     b = seg.bodies
     system_end = len(b[0]["tools"]) + len(b[0]["system"]) - 1
     # Ordinary appends (calls 1 -> 2 and 2 -> 3): the whole previous working context, up to its last entry, is a
@@ -191,7 +191,7 @@ def test_the_segmented_layout_works_without_caching() -> None:
     for body in plain.bodies:
         assert body.get("cache_control") is None
         assert not any("cache_control" in c for c in [*body.get("tools", []), *body["messages"][0]["content"]])
-    single = run_conversation(conversation(), settings={})
+    single = run_conversation(conversation(), settings={}, request_layout="single")
     norm: Callable[[dict[str, Any]], str] = lambda body: SIZE.sub(  # noqa: E731
         "N", "".join(c["text"] for c in body["messages"][0]["content"])
         if isinstance(body["messages"][0]["content"], list) else body["messages"][0]["content"])  # fmt: skip
@@ -273,7 +273,9 @@ EXPECTED = {
 
 @pytest.mark.parametrize("layout", ["segmented_task_last", "segmented", "single"])
 def test_which_cached_boundary_survives_each_call_over_three_turns(layout: str) -> None:
-    options: dict[str, Any] = {"request_layout": layout, "cache_point": "5m"} if layout != "single" else {}
+    options: dict[str, Any] = (
+        {"request_layout": layout, "cache_point": "5m"} if layout != "single" else {"request_layout": "single"}
+    )
     b = run_turns(three_turns(), settings=HOST_CACHING, **options).bodies
     assert len(b) == 10
     for call, want in enumerate(EXPECTED[layout], start=1):
@@ -327,7 +329,7 @@ def test_task_last_markers_and_caching_disabled() -> None:
         assert explicit + (body.get("cache_control") is not None) <= 4
         assert [i for i, c in enumerate(content) if "cache_control" in c] == [len(content) - 2]
         assert "<task>\n" in content[-1]["text"] and "<runtime_status>\n" in content[-1]["text"]
-    plain = run_turns(three_turns(), settings={}, request_layout="segmented_task_last").bodies
+    plain = run_turns(three_turns(), settings={}, cache_point=None).bodies  # an explicit None: no library marker
     for body in plain:
         assert body.get("cache_control") is None
         assert not any("cache_control" in c for c in [*body.get("tools", []), *body["messages"][0]["content"]])
@@ -413,3 +415,34 @@ def test_task_last_prefixed_turns_and_notes_keep_the_cache_boundaries() -> None:
     record = json.dumps({"id": "t2.request", "role": "observation", "body": PREFIXED[1], "protected": True})
     assert texts[6].count(record.replace("<", "\\u003c")) == 1
     assert "Current request:\n[context manager] 1 step(s) left: finish now." in texts[6]
+
+
+# ---------------------------------------------------------------------- the defaults (decisions P13)
+
+
+@pytest.mark.parametrize(
+    "settings", [RECOMMENDED, HOST_CACHING, {}], ids=["recommended", "host-automatic", "no-caching"]
+)
+def test_omitted_options_send_the_same_requests_as_the_explicit_new_defaults(settings: dict[str, Any]) -> None:
+    """With the host's settings unchanged, clm_context() without layout options sends exactly what
+    request_layout="segmented_task_last", cache_point="5m" sends; the library never changes the model settings, so
+    a host's automatic caching, if set, stays on the last block."""
+    omitted = run_turns(three_turns(), settings=settings).bodies
+    explicit = run_turns(
+        three_turns(), settings=settings, request_layout="segmented_task_last", cache_point="5m"
+    ).bodies
+    assert omitted == explicit
+    for body in omitted:
+        content = body["messages"][0]["content"]
+        assert [i for i, c in enumerate(content) if "cache_control" in c] == [len(content) - 2]  # the library marker
+        assert (body.get("cache_control") is not None) == ("anthropic_cache" in settings)
+        assert ("cache_control" in body["tools"][-1]) == ("anthropic_cache_tool_definitions" in settings)
+
+
+def test_explicit_single_sends_the_original_one_block_request() -> None:
+    bodies = run_turns(three_turns(), settings=HOST_CACHING, request_layout="single").bodies
+    for body in bodies:
+        [block] = body["messages"][0]["content"] if isinstance(body["messages"][0]["content"], list) else [
+            {"type": "text", "text": body["messages"][0]["content"]}]  # fmt: skip
+        assert block["text"].startswith("<task>\n") and "cache_control" not in block
+        assert "guarded_clm" not in json.dumps(body)

@@ -20,7 +20,7 @@ This file links to those documents rather than repeating them.
 | 4 | A second opt-in layout, the task after the working context, for reuse across turns (decisions P9) | **done offline** (2026-10-23); not checked live |
 | 5 | Provenance-based turn detection in the task-last layout, and the recommended host cache settings (decisions P10, P11) | **done offline** (2026-10-23) |
 | 5b | Message origin by runtime metadata for notes too, in the task-last layout (decisions P12) | **done offline** (2026-10-23) |
-| 6 | Make `segmented_task_last` with a cache point the default (decisions P11) | **planned**; waits for the live validation |
+| 6 | Make `segmented_task_last` with a cache point the default (decisions P11, P13) | **done** (2026-10-23), 0.3.0.dev0; not released |
 
 ## 1. The `ClmContext` implementation, replacing the preliminary core
 
@@ -100,7 +100,7 @@ This file links to those documents rather than repeating them.
   3. a separately authorised, bounded live validation shows cache reads at the expected boundaries within and across turns, and checks task behaviour with the task after the working context.
 - **Done when:** the default is switched with a minor version bump and a release note; the stored transcripts run under an explicit `request_layout="single"` and stay identical; README and SPEC describe the new default.
 - **Caller migration** is listed in decisions P11: `request_layout="single"` keeps today's behaviour; the new default needs the history's metadata kept and host notes added with `add_context_note()`.
-- **Not in scope until then:** switching the default, or describing live cache reuse or task behaviour as established.
+- **Status (2026-10-23, decisions P13):** done as 0.3.0.dev0. The live checks were run by a downstream harness (its results repository holds them); the stored transcripts run with `request_layout="single"` selected explicitly and are unchanged. No tag or release.
 
 ## Scope of this plan
 

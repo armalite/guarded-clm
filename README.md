@@ -15,11 +15,13 @@ Model-controlled working context for AI agents, with structured edits, guarded t
 
 [Visual walkthrough: how guarded-clm works](https://claude.ai/artifact/24Qq2iwUpn7AWotTJfLNNe)
 
-The model doesn't receive a growing message history. Every request is rebuilt from a list of entries: its actions, the tools' outputs, receipts and its own notes. The request has three parts:
+The model doesn't receive a growing message history. Every request is rebuilt from a list of entries: its actions, the tools' outputs, receipts and its own notes. The request has three parts, in this order by default:
 
-- **`<task>`:** the conversation's first request, plus the current one.
-- **`<working_context>`:** the entries, one JSON object per line.
+- **`<working_context>`:** the entries, one JSON object per line, each sent as its own content block, with a five-minute prompt-cache marker after the last one;
+- **`<task>`:** the conversation's first request, plus the current one;
 - **`<runtime_status>`:** the step, the calls, the size against the limit, and any notices.
+
+Everything that changes on every call comes after the marker, so a provider with prompt caching can reuse the unchanged working context within a turn and across turns (see [Prompt caching](#prompt-caching)).
 
 The model tidies the context with one tool, `edit_context`. With it, the model can delete entries, replace an entry's text, or add a note, and it decides what to keep. The runtime:
 
@@ -48,7 +50,14 @@ The only runtime dependency is `pydantic-ai-slim>=2.27.1,<2.28`, the Pydantic AI
 from pydantic_ai import Agent, UsageLimits
 from guarded_clm import CALL_CAP, clm_context
 
-agent = Agent(model, system_prompt=SYSTEM, tools=[...], capabilities=[clm_context()])
+agent = Agent(
+    model,
+    system_prompt=SYSTEM,
+    tools=[...],
+    capabilities=[clm_context()],  # the default layout, with its five-minute working-context cache marker
+    # For an Anthropic model, the recommended host caching (the library never sets model settings):
+    model_settings={"anthropic_cache_tool_definitions": "5m", "anthropic_cache_instructions": "5m"},
+)
 
 result = await agent.run(
     user_message,
@@ -58,7 +67,7 @@ result = await agent.run(
 )
 ```
 
-**Pass both `conversation_id` and `message_history` on every turn.** With the id alone, the working context continues, but the previous turn's answer is never added to it ([SPEC.md](SPEC.md), section 12).
+**Pass both `conversation_id` and `message_history` on every turn.** With the id alone, the working context continues, but the previous turn's answer is never added to it ([SPEC.md](SPEC.md), section 12). Pass back `result.all_messages()` (or its JSON form) unchanged: the runtime recognises its own rebuilt request by its `ModelRequest.metadata`.
 
 A runnable, offline version with a scripted model and two turns is in [examples/basic_agent.py](examples/basic_agent.py):
 
@@ -78,39 +87,49 @@ uv run python examples/basic_agent.py
 | `limits` | 200 entries, 24,000 characters per entry, 120,000 in total, 256,000 bytes serialized | The working context's limits. |
 | `on_record` | `None` | Called with each trace record (a dict), for logging or tracing. |
 | `id` | `"clm_context"` | The capability id. Pass another if a different capability already uses `clm_context`. |
-| `request_layout` | `"single"` | `"single"`: the request's text in one block, as tested. `"segmented"` and `"segmented_task_last"`: several content blocks, one per entry (see below). |
-| `cache_point` | `None` | With a segmented layout, a prompt-cache marker (`"5m"` or `"1h"`) after the last entry. |
+| `request_layout` | `"segmented_task_last"` | The request layout (see [Prompt caching](#prompt-caching)). `"single"`: the original one-block layout. `"segmented"`: the single layout's text as blocks, task first. |
+| `cache_point` | `"5m"` with `"segmented_task_last"`; none with the other layouts | The working-context prompt-cache marker after the last entry: `"5m"`, `"1h"`, or `None` for no marker. A marker needs a segmented layout. |
 
-**Prompt caching (opt-in).** By default each request is rebuilt as one text block that ends with a status section changing on every call. Prompt caching works at content-block boundaries, so a provider can then reuse only the tools and the system prompt, not the working context. Two opt-in layouts send the context as separate blocks and mark the last entry with a Pydantic AI `CachePoint`:
+### Prompt caching
 
-| | `"single"` (default) | `"segmented"` | `"segmented_task_last"` |
+**By default (since 0.3.0.dev0)** the request is sent as separate content blocks: the working-context entries first, a five-minute Pydantic AI `CachePoint` after the last one, then the task and the status. A provider with prompt caching can reuse the unchanged working context on every ordinary call and when a new user turn starts: a new turn adds the previous answer and question as entries and changes only the text after the marker.
+
+| | `"segmented_task_last"` (default) | `"segmented"` | `"single"` (original) |
 |---|---|---|---|
-| block order | one block | task, entries, status | entries, then task and status |
-| reuse between calls in a turn | tools and system only | the working context | the working context |
-| reuse at a new user turn | tools and system only | tools and system only (the task block changes) | the working context |
-| after an accepted edit | tools and system only | from the first changed entry, where an earlier marker is still reachable | the same |
+| block order | entries, marker, then task and status | task, entries, status | one block |
+| cache marker when `cache_point` is omitted | `"5m"` | none (pass one to opt in) | none (not allowed) |
+| reuse between calls in a turn | the working context | the working context, with a marker | tools and system only |
+| reuse at a new user turn | the working context | tools and system only | tools and system only |
+| after an accepted edit | from the first changed entry, where an earlier marker is still reachable | the same | tools and system only |
 
-- **Use it:** `clm_context(request_layout="segmented_task_last", cache_point="5m")`.
-- **Recommended host settings** (Pydantic AI's Anthropic model settings; the library never sets or overrides them):
+**The recommended Anthropic host settings,** set by you in the model settings (the library never changes them):
 
-  ```python
-  model_settings = {
-      "anthropic_cache_tool_definitions": "5m",  # the last tool definition
-      "anthropic_cache_instructions": "5m",      # the system prompt and instructions
-      # leave out "anthropic_cache" and "anthropic_cache_messages": both mark the last block, which in this layout
-      # is the status tail. It changes on every request, so the entry written there would never be read.
-  }
-  ```
+```python
+model_settings = {
+    "anthropic_cache_tool_definitions": "5m",  # the tool definitions
+    "anthropic_cache_instructions": "5m",      # the system prompt and instructions
+    # Leave out "anthropic_cache" and "anthropic_cache_messages": both put a breakpoint on the last block, which is
+    # the changing status tail here, so what they write is never read.
+}
+```
 
-  With the context's own marker that makes three breakpoints (the provider allows four). The tool and instruction TTLs may be `"1h"`, but must not be shorter than `cache_point`'s.
-- **What still invalidates the cache:** an accepted edit, from the first entry it changes or removes. A later entry is reused only where an earlier request's marker ended there, within the provider's 20-block lookback.
-- **The default is unchanged.** The segmented layouts are not byte-identical to it: the model sees the same characters in several blocks, and the size estimates are slightly higher, because the extra framing is counted. `"segmented_task_last"` also shows the task after the working context, not before it, which a model may weigh differently. Its sizes and decisions are the same as `"segmented"`'s.
-- **With caching off,** or on a model without it, the marker is dropped and the layouts work unchanged. `cache_point=None` sends no marker at all.
-- **History and notes:** in the task-last layout the runtime tells its own rebuilt request and notes from user turns by `ModelRequest.metadata`, never by text. Pass back the messages from `result.all_messages()` (or their JSON form) unchanged, and keep one layout per conversation. A user turn is a turn whatever its text, including openings like `<task>`, `<working_context>` or `[context manager]`.
-- **Adding your own note** to the runtime status: call `add_context_note(request, text)` from a capability placed before `clm_context()`. In the task-last layout that is the only way: a user prompt part that merely starts with `[context manager]` is user text there. The older layouts still accept the prefix (SPEC 13.19).
-- **The intended default:** the next release is intended to default to `"segmented_task_last"` with `cache_point="5m"`, once a live check has shown cache reuse within and across turns and checked task behaviour. Until then the default stays `"single"`, and `"single"` and `"segmented"` will stay available explicitly. To keep today's behaviour after the switch, pass `request_layout="single"`. To adopt the new default, follow the history and notes points above (decisions P11). Caching depends on the provider; no layout guarantees a cache hit.
-- **Provider rules still apply:** a prefix shorter than the model's minimum cacheable length is not cached, and the marker's TTL must not be longer than the host's earlier breakpoints'.
-- **Details:** [SPEC.md, sections 3.1 and 3.2](SPEC.md#3-the-request) and [docs/decisions.md](docs/decisions.md) (P8 to P11). An offline example is in [examples/segmented_layout.py](examples/segmented_layout.py).
+- **Together with the library's marker,** that makes three breakpoints (the provider allows four). The tool and instruction TTLs may be `"1h"`, but must not be shorter than the marker's.
+- **Caching is not guaranteed.** It depends on the provider and model: a prefix shorter than the model's minimum cacheable length is not cached, entries expire after their lifetime, and a breakpoint looks back only a limited number of blocks. Models without prompt caching drop the marker, and the layout works unchanged.
+- **What still invalidates it:** an accepted edit, from the first entry it changes or removes. Later entries are reused only where an earlier request's marker ended there.
+- **What the model sees:** the task after its working context, in several blocks. The size estimates count the extra framing, so they are slightly higher than the single layout's.
+
+**Choosing another layout or no marker:**
+- **the original behaviour exactly:** `clm_context(request_layout="single")`; it is what the stored transcripts test;
+- **the new layout without the library's marker:** `clm_context(cache_point=None)`;
+- **the task-first segmented layout:** `clm_context(request_layout="segmented", cache_point="5m")`;
+- **invalid:** a marker with `"single"` (or an unknown layout or TTL) raises `ValueError`.
+
+**Keep these when you use it:**
+- **one layout per conversation:** the stored history is read in the layout it was written in;
+- **the history's metadata:** pass back the messages unchanged. In the default layout the runtime tells its rebuilt request and its notes from user turns by `ModelRequest.metadata`, never by text, so a user turn that opens like `<task>`, `<working_context>` or `[context manager]` is still a turn;
+- **your own notes:** add a note to the runtime status with `add_context_note(request, text)`, from a capability placed before `clm_context()`. In the default layout a user prompt part that merely starts with `[context manager]` is user text. The single and segmented layouts still read that prefix as a note (SPEC 13.19).
+
+**Details:** [SPEC.md, section 3](SPEC.md#3-the-request) and [docs/decisions.md](docs/decisions.md) (P8 to P13). Offline examples are in [examples/basic_agent.py](examples/basic_agent.py) and [examples/segmented_layout.py](examples/segmented_layout.py).
 
 **How a run can end early:**
 
